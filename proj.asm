@@ -219,17 +219,24 @@ listen_keyboard_line:
     POP	R2
     RET
 
+; R7 = 0 -> stay in the same position
+; R7 = +1 -> move right
+; R7 = -1 -> move left
 movement:
+  CMP R7, 0
+  JZ return_movement ;if R7 is set to 0, then don't move
+
+  ;otherwise start by deleting the old sprite
   MOV R8, 0 ;set action to "delete"
   CALL render_sprite ; delete sprite with action setted previously
 
-  ; R7 = +1 -> move right
-  ; R7 = -1 -> move left
   ADD R1, R7 ;move sprite one pixel to setted direction
 
   MOV R8, 1 ;set action to "write"
   CALL render_sprite ;render sprite with action setted previously
-  RET
+
+  return_movement:
+    RET
 
 check_right_boundary:
   PUSH R1
