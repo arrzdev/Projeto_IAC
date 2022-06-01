@@ -6,8 +6,8 @@ SET_PIXEL  EQU 6012H
 DELETE_WARNING  EQU 6040H
 
 ;screen
-CLEAR_SCREEN  EQU 6002H
-SET_BACKGROUND  EQU 6042H
+CLEAR_SCREEN EQU 6002H
+SET_BACKGROUND EQU 6042H
 
 MIN_SCREEN_WIDTH EQU 0
 MAX_SCREEN_WIDTH EQU 64
@@ -16,23 +16,23 @@ MIN_SCREEN_HEIGHT EQU 0
 MAX_SCREEN_HEIGHT EQU 32
 
 ;keyboard
-KEY_LIN				EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
-KEY_COL				EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
-KEY_MAX_LIN		EQU 8		; linha a testar (4ª linha)
-MASK				  EQU 0FH	
+KEY_LIN EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
+KEY_COL EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
+KEY_MAX_LIN EQU 8		; linha a testar (4ª linha)
+MASK EQU 0FH	
 
 ;keys
 KEY_0 EQU 00H
 KEY_4 EQU 04H
 
 ;starting space ship coords
-X  EQU 0
-Y  EQU 28
+X EQU 0
+Y EQU 28
 
 ;colors
-RED  EQU 0FF00H
-ORANGE  EQU 0FF95H
-BLUE  EQU 0FCCFH
+RED EQU 0FF00H
+ORANGE EQU 0FF95H
+BLUE EQU 0FCCFH
 GRAY EQU 0FDDFH
 
 ;set table address
@@ -44,18 +44,18 @@ pilha:
 INITIAL_SP:
 
 DEF_SPACE_SHIP:
-  WORD  5 ;lenght value of space ship
-  WORD  4 ;height value of space ship
+  WORD 5 ;lenght value of space ship
+  WORD 4 ;height value of space ship
   
   ;define colors of space ship
-	WORD  0, 0, GRAY, 0, 0		
-	WORD  0, GRAY, 0, GRAY, 0
-	WORD  BLUE, GRAY, GRAY, GRAY, BLUE
-  WORD  ORANGE, 0, 0, 0, ORANGE
+  WORD 0, 0, GRAY, 0, 0		
+  WORD 0, GRAY, 0, GRAY, 0
+  WORD BLUE, GRAY, GRAY, GRAY, BLUE
+  WORD ORANGE, 0, 0, 0, ORANGE
 
 
 ;codigo
-PLACE 0
+PLACE  0
 
 setup:
   MOV  SP, INITIAL_SP ;init stack pointer
@@ -80,7 +80,9 @@ start:
   CALL render_sprite
 
   ;start keyboard listen
-  JMP handle_keyboard
+  keyboard_handler_loop:  
+    CALL handle_keyboard
+    JMP keyboard_handler_loop
 
 render_sprite:
   ; R1 is the current "x" position
@@ -94,11 +96,11 @@ render_sprite:
   PUSH R4
   PUSH R5
 
-  MOV R4, [R3]   ;get lenght of sprite
+  MOV R4, [R3] ;get lenght of sprite
   MOV R5, [R3+2] ;get height of sprite
 
   ;get first pixel
-  ADD R3, 2 ;move to  starting point of pixel rendering
+  ADD R3, 2 ;move to starting point of pixel rendering
   ; R3 is set to be the pixel before 
   
   MOV R6, R4 ;value of current index color of pixel to render
@@ -122,20 +124,16 @@ render_sprite:
   POP  R4
   POP  R3
   POP  R2
-  POP  R1  
+  POP  R1
   RET
-  
 
-; function to render pixel 
-; at line of address SET_LINE and column of address SET_COLUMN
-; pixel color is in R3
 render_pixel:
   PUSH R4
   PUSH R5
 
   MOV R5, 1 ;set R5 as constant 1
 
-  AND R8, R5  ;check if action is "write"
+  AND R8, R5 ;check if action is "write"
   JZ delete_pixel ;if 0 then delete pixel
   MOV R4, [R3] ;get pixel color from index R3
   JMP set_pixel
@@ -152,6 +150,75 @@ render_pixel:
   POP R4
   RET
 
+handle_keyboard:
+  PUSH R0 ;R0 - column to test
+  PUSH R6 ;R6 - line to test (1, 2, 4 ou 8)
+
+  MOV R6, 1 ;first line to test 
+
+  test_line:
+    CALL listen_keyboard_line
+    CMP R0, -1 ;if not pressed
+    JNZ key_found
+    ROL R6, 1
+    JMP test_line
+  
+  key_found:
+    CMP R0, KEY_0
+    JZ key_0_func
+
+    CMP R0, KEY_4
+    JZ key_4_func
+
+    ;the key doesn't have any action associated
+    JMP return_handle
+
+  ; Move space ship left
+  key_0_func:
+    MOV R7, -1 ;set momentum to -1
+    CALL check_left_boundary
+    CALL movement
+    JMP return_handle
+
+  ; Move space ship right
+  key_4_func:
+    MOV R7, +1 ;set momentum to +1
+    CALL check_right_boundary
+    CALL movement
+    JMP return_handle ;the first elif dont need a jump..
+                      ;(remove after implementing all actions)
+
+  return_handle:
+    POP R6
+    POP R0
+    RET
+
+listen_keyboard_line:
+  PUSH  R2
+  PUSH  R3
+  PUSH  R5
+  
+	MOV  R2, KEY_LIN ;adress of keyboard lines
+	MOV  R3, KEY_COL ;adress of keyboard columns
+	MOV  R5, MASK ;isolate the 4 dominant bits 
+	MOVB [R2], R6 ;set the line to be read
+	MOVB R0, [R3] ;read the column pressed
+	AND  R0, R5 ;isolate the 4 dominant bits
+
+  CMP R0, 0 ;check if there isn't any key pressed
+  JZ set_not_found
+  CALL convert_to_key ;convert column and line to key
+  JMP return_key
+
+  set_not_found:
+    MOV R0, -1 ;set listened key as -1
+
+  return_key:
+    POP	R5
+    POP	R3
+    POP	R2
+    RET
+
 movement:
   MOV R8, 0 ;set action to "delete"
   CALL render_sprite ; delete sprite with action setted previously
@@ -162,7 +229,6 @@ movement:
 
   MOV R8, 1 ;set action to "write"
   CALL render_sprite ;render sprite with action setted previously
-
   RET
 
 check_right_boundary:
@@ -204,77 +270,9 @@ check_left_boundary:
     POP R5
     RET
 
-;function to stop movement
 stop_movement:
   MOV R7, 0 ;set momentum to 0
   RET
-  
-handle_keyboard:
-  PUSH R0 ; R0 - column to test
-  PUSH R6 ; R6 - line to test (1, 2, 4 ou 8)
-
-  MOV R6, 1 ;first line to test 
-
-  test_line:
-    CALL listen_keyboard_line
-    CMP R0, -1 ;if not pressed
-    JNZ key_found
-    ROL R6, 1
-    JMP test_line
-  
-  key_found:
-    CMP R0, KEY_0
-    JZ key_0_func
-
-    CMP R0, KEY_4
-    JZ key_4_func
-
-  ; Move space ship left
-  key_0_func:
-    MOV R7, -1 ;set momentum to -1
-    CALL check_left_boundary
-    CALL movement
-    JMP handle_keyboard
-
-  ; Move space ship right
-  key_4_func:
-    MOV R7, +1 ;set momentum to +1
-    CALL check_right_boundary
-    CALL movement
-    JMP handle_keyboard
-
-
-  POP R6
-  POP R0
-
-  JMP handle_keyboard
-
-listen_keyboard_line:
-  PUSH  R2
-  PUSH  R3
-  PUSH  R5
-  
-	MOV  R2, KEY_LIN ;adress of keyboard lines
-	MOV  R3, KEY_COL ;adress of keyboard columns
-	MOV  R5, MASK ;isolate the 4 dominant bits 
-	MOVB [R2], R6 ;set the line to be read
-	MOVB R0, [R3] ;read the column pressed
-	AND  R0, R5 ;isolate the 4 dominant bits
-
-  CMP R0, 0 ;check if there isn't any key pressed
-  JZ set_not_found
-  CALL convert_to_key ;convert column and line to key
-  JMP return_key
-
-  set_not_found:
-    MOV R0, -1 ;set listened key as -1
-
-  return_key:
-    POP	R5
-    POP	R3
-    POP	R2
-    RET
-
 
 convert_to_key:
   PUSH R3
@@ -313,7 +311,7 @@ normalize_index:
       ADD R9, 1 ;increment counter
       SHR R0, 1 ;shift to the right
       CMP R0, 0
-      JNZ not_zero
+      JGT not_zero ;if not zero then continue
     
   RET
 
