@@ -27,13 +27,16 @@ KEY_4 EQU 04H
 
 ;starting space ship coords
 X EQU 0
-Y EQU 28
+Y EQU 25
 
 ;colors
+;kinda nude 0FFAAH
+;black 0F000H
 RED EQU 0FF00H
-ORANGE EQU 0FF95H
-BLUE EQU 0FCCFH
-GRAY EQU 0FDDFH
+BROWN EQU 0F000H
+NUDE EQU 0FFB5H
+BLUE EQU 0F06FH
+WHITE EQU 0FFFFH
 
 ;set table address
 PLACE 1000H; address where table starts
@@ -43,15 +46,16 @@ pilha:
 
 INITIAL_SP:
 
-DEF_SPACE_SHIP:
+ENTITIE_MARIO:
   WORD 5 ;lenght value of space ship
-  WORD 4 ;height value of space ship
+  WORD 5 ;height value of space ship
   
   ;define colors of space ship
-  WORD 0, 0, GRAY, 0, 0		
-  WORD 0, GRAY, 0, GRAY, 0
-  WORD BLUE, GRAY, GRAY, GRAY, BLUE
-  WORD ORANGE, 0, 0, 0, ORANGE
+  WORD 0, RED, RED, RED, RED		
+  WORD 0, BROWN, NUDE, NUDE, 0
+  WORD RED, BLUE, RED, BLUE, RED
+  WORD WHITE, BLUE, BLUE, BLUE, WHITE
+  WORD 0, BROWN, 0, BROWN, 0
 
 
 ;codigo
@@ -73,7 +77,7 @@ start:
   MOV R2, Y
 
   ;set starting sprite and write action
-  MOV R3, DEF_SPACE_SHIP ;set sprite table to be rendered
+  MOV R3, ENTITIE_MARIO ;set sprite table to be rendered
   MOV R8, 1 ;set action to "write"
 
   ;first render of the space ship
