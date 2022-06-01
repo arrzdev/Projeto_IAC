@@ -24,7 +24,7 @@ MASK EQU 0FH
 ;keys
 KEY_LEFT EQU 00H
 KEY_RIGHT EQU 02H
-KEY_DOWN EQU 0CH
+KEY_DOWN EQU 03H
 
 ;colors
 ;kinda nude 0FFAAH
@@ -224,6 +224,9 @@ handle_keyboard:
     CMP R0, KEY_RIGHT
     JZ move_mario_right
 
+    CMP R0, KEY_DOWN
+    JZ move_goomba_down
+
     ;the key doesn't have any action associated
     JMP return_handle
 
@@ -275,8 +278,17 @@ handle_keyboard:
 
     CALL check_right_boundary
     CALL movement
-    JMP return_handle ;the first elif dont need a jump..
-                      ;(remove after implementing all actions)
+    JMP return_handle
+
+  move_goomba_down:
+    ;set action entity as goomba
+    MOV R3, ENTITIE_GOOMBA
+
+    ;move
+    MOV R7, 2 ;set momentum as 2 (special value for falling entities)
+
+    CALL check_bottom_boundary
+    CALL movement
 
   return_handle:
     POP R6
@@ -315,7 +327,8 @@ listen_keyboard_line:
 ; R7 = +1 -> move right
 ; R7 = -1 -> move left
 movement:
-  PUSH R0
+  PUSH R1
+  PUSH R2
 
   CMP R7, 0
   JZ return_movement ;if R7 is set to 0, then don't move
@@ -324,18 +337,32 @@ movement:
   MOV R8, 0 ;set action to "delete"
   CALL render_sprite ; delete sprite with action setted previously
   
-  ;get entity x position
-  MOV R0, [R3]
-  ADD R0, R7 ;move entity one pixel to setted direction
+  ;get entity position
+  MOV R1, [R3] ;x 
+  MOV R2, [R3+2] ;y
+
+  ;check if we have the special value for falling entities (2)
+  CMP R7, 2
+  JZ vertical_move
+
+  ;horizontal movement
+  ADD R1, R7 ;move entity one pixel to setted direction
+  JMP update_position_scope
+
+  vertical_move:
+    ADD R2, 1 ;move entity one pixel down
 
   ;update position on entity scope
-  MOV [R3], R0
+  update_position_scope:
+    MOV [R3], R1 ;x
+    MOV [R3+2], R2 ;y
 
   MOV R8, 1 ;set action to "write"
   CALL render_sprite ;render sprite with action setted previously
 
   return_movement:
-    POP R0
+    POP R2
+    POP R1
     RET
 
 check_right_boundary:
@@ -352,13 +379,13 @@ check_right_boundary:
   ADD R1, R6 ;get sprite right edge
 
   CMP R5, R1 ;check if sprite right edge is greater than screen right edge
-  JZ else_check_right_boundary
-  JMP endif_check_right_boundary
+  JZ if_right_collision
+  JMP return_check_right
 
-  else_check_right_boundary:
+  if_right_collision:
     CALL stop_movement
 
-  endif_check_right_boundary:
+  return_check_right:
     POP R6
     POP R5
     POP R1
@@ -373,15 +400,50 @@ check_left_boundary:
   MOV R5, MIN_SCREEN_WIDTH ;get screen min width
   
   CMP R5, R1 ;if this returns 0 then sprite is at left screen boundary and we can't move
-  JZ else_check_left_boundary
-  JMP endif_check_left_boundary
+  JZ if_left_collision
+  JMP return_check_left
 
-  else_check_left_boundary:
+  if_left_collision:
     CALL stop_movement
 
-  endif_check_left_boundary:
+  return_check_left:
     POP R5
     RET
+
+check_bottom_boundary:
+  PUSH R1
+  PUSH R2
+  PUSH R3
+
+  ;get entity Y position
+  MOV R1, [R3+2]
+
+  ;get entity height
+  MOV R2, [R3+8]
+
+  ;calc max Y position
+  MOV R3, MAX_SCREEN_HEIGHT
+
+  ;subtract 2 because of the ground
+  SUB R3, 2
+
+  ;get entity bottom edge
+  ADD R1, R2
+
+  ;check colision with ground
+  CMP R1, R3
+  JZ if_bottom_collision
+  JMP return_check_bottom
+
+  if_bottom_collision:
+    CALL stop_movement
+
+  return_check_bottom:
+    POP R3
+    POP R2
+    POP R1
+    RET
+
 
 stop_movement:
   MOV R7, 0 ;set momentum to 0
