@@ -45,14 +45,14 @@ pilha:
 INITIAL_SP:
 
 ENTITIE_MARIO:
-  ;entitie position
+  ;entity position
   WORD 30 ;default x
   WORD 25 ;default y
 
-  ;entitie sprite index
+  ;entity sprite index
   WORD 0 ;default sprite index
 
-  ;entitie size
+  ;entity size
   WORD 5 ;lenght value of caracter
   WORD 5 ;height value of caracter
   
@@ -74,10 +74,10 @@ ENTITIE_GOOMBA:
   WORD 30 ;default x
   WORD 0 ;default y
 
-  ;entitie sprite index
+  ;entity sprite index
   WORD 0 ;default sprite index
 
-  ;entitie size
+  ;entity size
   WORD 5 ;lenght value of caracter
   WORD 5 ;height value of caracter
 
@@ -134,16 +134,16 @@ render_sprite:
   PUSH R6
   PUSH R7
 
-  ;get entitie position
+  ;get entity position
   MOV R1, [R3] ;x
   MOV R2, [R3+2] ;y
 
   ;get selected sprite
   MOV R7, [R3+4]
 
-  ;get entitie length
-  MOV R4, [R3+6] ;get entitie length
-  MOV R5, [R3+8] ;get entitie height
+  ;get entity length
+  MOV R4, [R3+6] ;get entity length
+  MOV R5, [R3+8] ;get entity height
 
   ;get first pixel
   MOV R0, 8
@@ -228,7 +228,7 @@ handle_keyboard:
     JMP return_handle
 
   move_mario_left:
-    ;set action entitie as mario
+    ;set action entity as mario
     MOV R3, ENTITIE_MARIO
 
     ;get current background index
@@ -253,7 +253,7 @@ handle_keyboard:
     JMP return_handle
 
   move_mario_right:
-    ;set action entitie as mario
+    ;set action entity as mario
     MOV R3, ENTITIE_MARIO
 
     ;get current background index
@@ -324,11 +324,11 @@ movement:
   MOV R8, 0 ;set action to "delete"
   CALL render_sprite ; delete sprite with action setted previously
   
-  ;get entitie x position
+  ;get entity x position
   MOV R0, [R3]
-  ADD R0, R7 ;move entitie one pixel to setted direction
+  ADD R0, R7 ;move entity one pixel to setted direction
 
-  ;update position on entitie scope
+  ;update position on entity scope
   MOV [R3], R0
 
   MOV R8, 1 ;set action to "write"
@@ -343,11 +343,11 @@ check_right_boundary:
   PUSH R5
   PUSH R6
 
-  ;get entitie X position
+  ;get entity X position
   MOV R1, [R3]
 
   MOV R5, MAX_SCREEN_WIDTH ;get screen max width
-  MOV R6, [R3+6] ;get lenght of the entitie
+  MOV R6, [R3+6] ;get lenght of the entity
 
   ADD R1, R6 ;get sprite right edge
 
@@ -367,7 +367,7 @@ check_right_boundary:
 check_left_boundary:
   PUSH R5
 
-  ;get entitie X postion
+  ;get entity X postion
   MOV R1, [R3]
 
   MOV R5, MIN_SCREEN_WIDTH ;get screen min width
