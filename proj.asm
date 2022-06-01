@@ -9,9 +9,15 @@ DELETE_WARNING  EQU 6040H
 CLEAR_SCREEN  EQU 6002H
 SET_BACKGROUND  EQU 6042H
 
-;starting coords
-X  EQU 30
-Y  EQU 16
+MIN_SCREEN_WIDTH EQU 0
+MAX_SCREEN_WIDTH EQU 64
+
+MIN_SCREEN_HEIGHT EQU 0
+MAX_SCREEN_HEIGHT EQU 32
+
+;starting space ship coords
+X  EQU 0
+Y  EQU 28
 
 ;colors
 RED  EQU 0FF00H
@@ -62,7 +68,7 @@ start:
 
   ;first render of the space ship
   CALL render_sprite
-  JMP end
+  JMP movement
 
 render_sprite:
   ; R1 is the current "x" position
@@ -70,6 +76,8 @@ render_sprite:
   ; R4 is the sprite length
   ; R5 is the sprite height
 
+  PUSH R1
+  PUSH R2
   PUSH R3 ;save table address
   PUSH R4
   PUSH R5
@@ -101,14 +109,10 @@ render_line:
   POP  R5
   POP  R4
   POP  R3
+  POP  R2
+  POP  R1
   RET
-
-end:  
-  JMP end
   
-
-  
-
 
 ; function to render pixel 
 ; at line of address SET_LINE and column of address SET_COLUMN
@@ -124,13 +128,75 @@ render_pixel:
   MOV R4, [R3] ;get pixel color from index R3
   JMP set_pixel
 
-delete_pixel:
-  MOV R4, 0 ;set pixel color to 0
+  delete_pixel:
+    MOV R4, 0 ;set pixel color to 0
 
-set_pixel:
-	MOV [SET_X], R1 ;set line
-  MOV [SET_Y], R2 ;set line
-	MOV [SET_PIXEL], R4 ;change pixel color
-  POP R5
-  POP R4
-	RET
+  set_pixel:
+    MOV [SET_X], R1 ;set line
+    MOV [SET_Y], R2 ;set line
+    MOV [SET_PIXEL], R4 ;change pixel color
+    POP R5
+    POP R4
+    RET
+
+movement:
+  CALL check_right_boundary
+  
+  MOV R8, 0 ;set action to "delete"
+  CALL render_sprite ; delete sprite with action setted previously
+
+  ; R7 = +1 -> move right
+  ; R7 = -1 -> move left
+  ADD R1, R7 ;move sprite one pixel to setted direction
+
+  MOV R8, 1 ;set action to "write"
+  CALL render_sprite ;render sprite with action setted previously
+
+  JMP movement
+
+check_right_boundary:
+  PUSH R1
+  PUSH R5
+  PUSH R6
+
+  MOV R5, MAX_SCREEN_WIDTH ;get sprite table
+  MOV R6, [R3] ;get lenght of sprite
+
+  ADD R1, R6 ;get sprite right edge
+
+  CMP R5, R1 ;check if sprite right edge is greater than screen right edge
+  JZ else_check_right_boundary
+  JMP endif_check_right_boundary
+
+  else_check_right_boundary:
+    CALL stop_movement
+
+  endif_check_right_boundary:
+    POP R6
+    POP R5
+    POP R1
+    RET
+
+check_left_boundary:
+  PUSH R5
+
+  MOV R5, MIN_SCREEN_WIDTH ;get screen min width
+  
+  CMP R5, R1 ;if this returns 0 then sprite is at left screen boundary and we can't move
+  JZ else_check_left_boundary
+  JMP endif_check_left_boundary
+
+  else_check_left_boundary:
+    CALL stop_movement
+
+  endif_check_left_boundary:
+    POP R5
+    RET
+
+;function to stop movement
+stop_movement:
+  MOV R7, 0 ;set momentum to 0
+  RET
+  
+end:  
+  JMP end
