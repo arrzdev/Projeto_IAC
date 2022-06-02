@@ -15,6 +15,9 @@ MAX_SCREEN_WIDTH EQU 64
 MIN_SCREEN_HEIGHT EQU 0
 MAX_SCREEN_HEIGHT EQU 32
 
+;audio
+PLAY_SOUND EQU 0605AH
+
 ;keyboard
 KEY_LIN EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
 KEY_COL EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
@@ -378,6 +381,10 @@ movement:
   JMP update_position_scope
 
   vertical_move:
+    ;play sound
+    MOV R6, 0 ;audio with index 0
+    MOV [PLAY_SOUND], R6
+    
     ADD R2, 1 ;move entity one pixel down
 
   ;update position on entity scope
