@@ -1,9 +1,9 @@
 ;print
-SET_X  EQU 600CH
-SET_Y  EQU 600AH
+SET_X EQU 600CH
+SET_Y EQU 600AH
 
-SET_PIXEL  EQU 6012H
-DELETE_WARNING  EQU 6040H
+SET_PIXEL EQU 6012H
+DELETE_WARNING EQU 6040H
 
 ;screen
 CLEAR_SCREEN EQU 6002H
@@ -19,14 +19,20 @@ MAX_SCREEN_HEIGHT EQU 32
 PLAY_SOUND EQU 0605AH
 
 ;energy display
+<<<<<<< Updated upstream
 ENERGY_LEVEL EQU 0A000H ;address of energy display (POUT-1)
 ENERGY_MAX_LEVEL EQU 100
 ENERGY_MIN_LEVEL EQU 0
 
+=======
+SET_ENERGY EQU 0A000H ;address of energy display (POUT-1)
+MAX_ENERGY EQU 0100H
+MIN_ENERGY EQU 0H
+>>>>>>> Stashed changes
 
 ;keyboard
-KEY_LIN EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
-KEY_COL EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
+SET_KEY_LINE EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
+READ_KEY_COL EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
 KEY_MAX_LIN EQU 8		; linha a testar (4ª linha)
 MASK EQU 0FH	
 
@@ -91,7 +97,6 @@ ENTITIE_MARIO:
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
 
-
 ENTITIE_GOOMBA:
   WORD 30 ;default x
   WORD 0 ;default y
@@ -120,8 +125,10 @@ setup:
   MOV R1, 0 ;background 0
   MOV [SET_BACKGROUND], R1 ;set background
 
-  MOV R7, +1; value to increment when moving
-  ;initial set for momentum
+  ;initial values
+  MOV R7, +1 ;move direction
+  MOV R10, 010H ;energy value
+
   
 start:
   ;render initial entities
@@ -339,6 +346,7 @@ handle_keyboard:
     JMP return_handle
 
   energy_increase:
+<<<<<<< Updated upstream
     ;R10 is the register to store the current energy
     PUSH R1
     PUSH R2
@@ -391,6 +399,46 @@ handle_keyboard:
       POP R1
 
     JMP return_handle
+=======
+    CMP R4, R0
+    JZ return_handle
+
+    ;get max energy level
+    MOV R1, MAX_ENERGY
+
+    ;if energy is at max level, do nothing 
+    ;R10 stores the current energy
+    CMP R10, R1
+    JZ return_handle
+
+    ;otherwise
+    ADD R10, 1
+
+    ;save energy value
+    MOV R2, SET_ENERGY
+    MOV [R2], R10
+
+    JMP return_handle
+
+  energy_decrease:
+    CMP R4, R0
+    JZ return_handle
+
+    ;get max energy level
+    MOV R1, MIN_ENERGY
+
+    ;if energy is at min level, do nothing 
+    ;R10 stores the current energy
+    CMP R10, R1
+    JZ return_handle
+
+    ;otherwise
+    ADD R10, -1
+
+    ;save energy value
+    MOV R2, SET_ENERGY
+    MOV [R2], R10
+>>>>>>> Stashed changes
 
   return_handle:
     ;save key for later checks
@@ -406,12 +454,12 @@ listen_keyboard_line:
   PUSH  R3
   PUSH  R5
   
-	MOV  R2, KEY_LIN ;adress of keyboard lines
-	MOV  R3, KEY_COL ;adress of keyboard columns
-	MOV  R5, MASK ;isolate the 4 dominant bits 
-	MOVB [R2], R6 ;set the line to be read
-	MOVB R0, [R3] ;read the column pressed
-	AND  R0, R5 ;isolate the 4 dominant bits
+  MOV  R2, SET_KEY_LINE ;adress of keyboard lines
+  MOV  R3, READ_KEY_COL ;adress of keyboard columns
+  MOV  R5, MASK ;isolate the 4 dominant bits 
+  MOVB [R2], R6 ;set the line to be read
+  MOVB R0, [R3] ;read the column pressed
+  AND  R0, R5 ;isolate the 4 dominant bits
 
   CMP R0, 0 ;check if there isn't any key pressed
   JZ set_not_found
@@ -551,7 +599,6 @@ check_bottom_boundary:
     POP R2
     POP R1
     RET
-
 
 stop_movement:
   MOV R7, 0 ;set momentum to 0
