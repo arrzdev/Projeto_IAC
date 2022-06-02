@@ -45,30 +45,38 @@ pilha:
 INITIAL_SP:
 
 ENTITIE_MARIO:
-  ;entity position
+  ;entity position  
   WORD 30 ;default x
   WORD 25 ;default y
 
   ;entity sprite index
-  WORD 0 ;default sprite index
+  WORD 1 ;default sprite index
 
   ;entity size
   WORD 5 ;lenght value of caracter
   WORD 5 ;height value of caracter
   
-  ;sprite 0
+  ;sprite #0 (mario staying still)
+  WORD 0, RED, RED, RED, 0		
+  WORD 0, BLACK, NUDE, BLACK, 0
+  WORD RED, BLUE, RED, BLUE, RED
+  WORD WHITE, BLUE, BLUE, BLUE, WHITE
+  WORD 0, BLACK, 0, BLACK, 0
+
+  ;sprite #1 (mario looking left)
+  WORD RED, RED, RED, RED, 0		
+  WORD 0, NUDE, NUDE, BLACK, 0
+  WORD RED, BLUE, RED, BLUE, RED
+  WORD WHITE, BLUE, BLUE, BLUE, WHITE
+  WORD 0, BLACK, 0, BLACK, 0
+
+  ;sprite #2 (mario looking right)
   WORD 0, RED, RED, RED, RED		
   WORD 0, BLACK, NUDE, NUDE, 0
   WORD RED, BLUE, RED, BLUE, RED
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
 
-  ;sprite 1
-  WORD 0, BLUE, BLUE, BLUE, BLUE		
-  WORD 0, BLACK, NUDE, NUDE, 0
-  WORD BLUE, BLUE, BLUE, BLUE, BLUE
-  WORD WHITE, BLUE, BLUE, BLUE, WHITE
-  WORD 0, BLACK, 0, BLACK, 0
 
 ENTITIE_GOOMBA:
   WORD 30 ;default x
@@ -82,9 +90,9 @@ ENTITIE_GOOMBA:
   WORD 5 ;height value of caracter
 
   ;sprite 0
-  WORD 0, 0, RED, 0, 0
-  WORD 0, RED, WHITE, RED, 0
-  WORD RED, WHITE, RED, RED, RED
+  WORD 0, 0, BROWN, 0, 0
+  WORD 0, BROWN, WHITE, BROWN, 0
+  WORD BROWN, WHITE, BROWN, BROWN, BROWN
   WORD 0, BLACK, NUDE, BLACK, 0
   WORD 0, NUDE, NUDE, NUDE, 0
 
@@ -107,8 +115,7 @@ start:
   MOV R8, 1 ;set action to "write"
 
   ;render mario
-  MOV R3, ENTITIE_MARIO ;set sprite table to be rendered
-  CALL render_sprite
+  CALL idle_mario
 
   ;render goomba
   MOV R3, ENTITIE_GOOMBA
@@ -120,19 +127,14 @@ start:
     JMP keyboard_handler_loop
 
 render_sprite:
-  ; R1 is the current "x" position
-  ; R2 is the current "y" positioncurrent table index
-  ; R4 is the sprite length
-  ; R5 is the sprite height
-
-  PUSH R0
-  PUSH R1
-  PUSH R2
-  PUSH R3
-  PUSH R4
-  PUSH R5
-  PUSH R6
-  PUSH R7
+  PUSH R0 ;register to temp store values
+  PUSH R1 ;x
+  PUSH R2 ;y
+  PUSH R3 ;pixel n 
+  PUSH R4 ;lenght
+  PUSH R5 ;width
+  PUSH R6 ;iterator
+  PUSH R7 ;selected sprite
 
   ;get entity position
   MOV R1, [R3] ;x
@@ -145,17 +147,29 @@ render_sprite:
   MOV R4, [R3+6] ;get entity length
   MOV R5, [R3+8] ;get entity height
 
-  ;get first pixel
-  MOV R0, 8
+  ;get first pixel of the first sprite
+  MOV R0, 10
   ADD R3, R0 ;move to starting point of sprite rendering
   ;R3 is set to be the address before 
-  
+
+  ;calc how much bytes we need to skip to render next sprite
+  ;skip n lenght pixels * 2
+  MUL R7, R5 
+  MOV R0, 2;
+  MUL R7, R0
+
+  ;skip n height pixels
+  MUL R7, R5
+
+  ;get first pixel of the selected sprite
+  ADD R3, R7
+
   MOV R6, R4 ;starting iterator value
   
   render_line:
     ; loop to render line of pixels
-    ADD R3, 2 ;get pixel index to render
     CALL render_pixel
+    ADD R3, 2 ;get pixel index to render
     ADD R1, 1 ;move to next horizontal render position
     SUB R6, 1 ;decrement index of column iterator
     JNZ render_line
@@ -179,11 +193,8 @@ render_sprite:
 
 render_pixel:
   PUSH R4
-  PUSH R5
 
-  MOV R5, 1 ;set R5 as constant 1
-
-  AND R8, R5 ;check if action is "write"
+  CMP R8, 0 ;check if action is "write"
   JZ delete_pixel ;if 0 then delete pixel
   MOV R4, [R3] ;get pixel color from index R3
   JMP set_pixel
@@ -196,15 +207,13 @@ render_pixel:
     MOV [SET_Y], R2 ;set line
     MOV [SET_PIXEL], R4 ;change pixel color
     
-  POP R5
   POP R4
   RET
 
 handle_keyboard:
-  PUSH R0 ;R0 - column to test
+  PUSH R0 ;key that was listened / current background index
   PUSH R1 ;max background index
-  PUSH R2 ;temp store background value
-  PUSH R6 ;R6 - line to test (1, 2, 4 ou 8)
+  PUSH R6 ;line to test / sprite to render
 
   MOV R1, 8 ;set max background index
 
@@ -215,6 +224,7 @@ handle_keyboard:
     CMP R0, -1 ;if not pressed
     JNZ handle_actions
     ROL R6, 1
+
     JMP test_line
   
   handle_actions:
@@ -233,6 +243,10 @@ handle_keyboard:
   move_mario_left:
     ;set action entity as mario
     MOV R3, ENTITIE_MARIO
+
+    ;set sprite to render (left)
+    MOV R6, 1
+    MOV [R3+4], R6
 
     ;get current background index
     MOV R0, [SET_BACKGROUND]
@@ -258,6 +272,10 @@ handle_keyboard:
   move_mario_right:
     ;set action entity as mario
     MOV R3, ENTITIE_MARIO
+
+    ;set sprite to render (right)
+    MOV R6, 2
+    MOV [R3+4], R6
 
     ;get current background index
     MOV R0, [SET_BACKGROUND]
@@ -292,7 +310,6 @@ handle_keyboard:
 
   return_handle:
     POP R6
-    POP R2
     POP R1
     POP R0
     RET
@@ -489,6 +506,34 @@ normalize_index:
     JGT not_zero ;if not zero then continue
     
   RET
+
+idle_mario:
+  PUSH R4
+
+  ;set action entity as mario
+  MOV R3, ENTITIE_MARIO
+
+  ;delete old sprite if not idling
+  
+  ;get selected sprite
+  MOV R4, [R3+4] ;
+  CMP R4, 0 ;check if mario is set to idle
+  JZ return_idle_mario
+
+  MOV R8, 0 ;set action to "delete"
+  CALL render_sprite
+
+  ;set sprite to render (idle, looking forward)
+  MOV R6, 0
+  MOV [R3+4], R6
+
+  ;render new sprite
+  MOV R8, 1 ;set action to "write"
+  CALL render_sprite
+
+  return_idle_mario:
+    POP R4
+    RET
 
 end:  
   JMP end
