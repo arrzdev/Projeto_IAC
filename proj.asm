@@ -96,7 +96,6 @@ ENTITIE_GOOMBA:
   WORD 0, BLACK, NUDE, BLACK, 0
   WORD 0, NUDE, NUDE, NUDE, 0
 
-
 ;codigo
 PLACE  0
 
@@ -225,6 +224,10 @@ handle_keyboard:
     JNZ handle_actions
     ROL R6, 1
 
+    ;if there isn't any key pressed
+    ;reset last key
+    MOV R4, -1
+
     JMP test_line
   
   handle_actions:
@@ -299,6 +302,10 @@ handle_keyboard:
     JMP return_handle
 
   move_goomba_down:
+    ;if last action was goomba down, skip it
+    CMP R4, R0;
+    JZ return_handle
+
     ;set action entity as goomba
     MOV R3, ENTITIE_GOOMBA
 
@@ -308,7 +315,11 @@ handle_keyboard:
     CALL check_bottom_boundary
     CALL movement
 
+
   return_handle:
+    ;save key for later checks
+    MOV R4, R0 ;save it on register R4
+
     POP R6
     POP R1
     POP R0
