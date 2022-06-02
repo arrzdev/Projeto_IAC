@@ -18,6 +18,12 @@ MAX_SCREEN_HEIGHT EQU 32
 ;audio
 PLAY_SOUND EQU 0605AH
 
+;energy display
+ENERGY_LEVEL EQU 0A000H ;address of energy display (POUT-1)
+ENERGY_MAX_LEVEL EQU 100
+ENERGY_MIN_LEVEL EQU 0
+
+
 ;keyboard
 KEY_LIN EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
 KEY_COL EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
@@ -28,6 +34,8 @@ MASK EQU 0FH
 KEY_LEFT EQU 00H
 KEY_RIGHT EQU 02H
 KEY_DOWN EQU 03H
+KEY_ENERGY_UP EQU 04H
+KEY_ENERGY_DOWN EQU 05H
 
 ;colors
 ;kinda nude 0FFAAH
@@ -46,6 +54,9 @@ pilha:
   STACK 100H
 
 INITIAL_SP:
+
+image_hexa:
+	BYTE	00H
 
 ENTITIE_MARIO:
   ;entity position  
@@ -115,6 +126,8 @@ setup:
 start:
   ;render initial entities
   MOV R8, 1 ;set action to "write"
+
+  MOV R10, 0 ;set energy level to R10
 
   ;render mario
   CALL idle_mario
@@ -243,6 +256,12 @@ handle_keyboard:
     CMP R0, KEY_DOWN
     JZ move_goomba_down
 
+    CMP R0, KEY_ENERGY_UP
+    JZ energy_increase
+
+    CMP R0, KEY_ENERGY_DOWN
+    JZ energy_decrease
+
     ;the key doesn't have any action associated
     JMP return_handle
 
@@ -317,7 +336,61 @@ handle_keyboard:
 
     CALL check_bottom_boundary
     CALL movement
+    JMP return_handle
 
+  energy_increase:
+    ;R10 is the register to store the current energy
+    PUSH R1
+    PUSH R2
+    PUSH R3
+
+    MOV R2, ENERGY_LEVEL
+    MOV R3, ENERGY_MAX_LEVEL
+
+    CMP R4, R0
+    JZ not_increasing
+
+    ; if energy is at max level, do nothing
+    CMP R10, R3
+    JZ not_increasing
+
+    ADD R10, 1
+
+    MOVB [R2], R10
+
+    not_increasing:
+      POP R3
+      POP R2
+      POP R1
+
+    JMP return_handle
+
+  energy_decrease:
+    ;R10 is the register to store the current energy
+    PUSH R1
+    PUSH R2
+    PUSH R3
+
+    MOV R2, ENERGY_LEVEL
+    MOV R3, ENERGY_MAX_LEVEL
+
+    CMP R4, R0
+    JZ not_decreasing
+
+    ; if energy is at max level, do nothing
+    CMP R10, R3
+    JZ not_decreasing
+
+    SUB R10, 1
+
+    MOVB [R2], R10
+
+    not_decreasing:
+      POP R3
+      POP R2
+      POP R1
+
+    JMP return_handle
 
   return_handle:
     ;save key for later checks
