@@ -372,12 +372,12 @@ handle_keyboard:
     PUSH R3
 
     MOV R2, ENERGY_LEVEL
-    MOV R3, ENERGY_MAX_LEVEL
+    MOV R3, ENERGY_MIN_LEVEL
 
     CMP R4, R0
     JZ not_decreasing
 
-    ; if energy is at max level, do nothing
+    ; if energy is at min level, do nothing
     CMP R10, R3
     JZ not_decreasing
 
