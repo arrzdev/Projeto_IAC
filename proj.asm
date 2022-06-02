@@ -19,21 +19,14 @@ MAX_SCREEN_HEIGHT EQU 32
 PLAY_SOUND EQU 0605AH
 
 ;energy display
-<<<<<<< Updated upstream
-ENERGY_LEVEL EQU 0A000H ;address of energy display (POUT-1)
-ENERGY_MAX_LEVEL EQU 100
-ENERGY_MIN_LEVEL EQU 0
-
-=======
 SET_ENERGY EQU 0A000H ;address of energy display (POUT-1)
 MAX_ENERGY EQU 0100H
 MIN_ENERGY EQU 0H
->>>>>>> Stashed changes
 
 ;keyboard
-SET_KEY_LINE EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
-READ_KEY_COL EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
-KEY_MAX_LIN EQU 8		; linha a testar (4ª linha)
+SET_KEY_LINE EQU 0C000H	; (periférico POUT-2)
+READ_KEY_COL EQU 0E000H
+KEY_MAX_LIN EQU 8
 MASK EQU 0FH	
 
 ;keys
@@ -346,60 +339,6 @@ handle_keyboard:
     JMP return_handle
 
   energy_increase:
-<<<<<<< Updated upstream
-    ;R10 is the register to store the current energy
-    PUSH R1
-    PUSH R2
-    PUSH R3
-
-    MOV R2, ENERGY_LEVEL
-    MOV R3, ENERGY_MAX_LEVEL
-
-    CMP R4, R0
-    JZ not_increasing
-
-    ; if energy is at max level, do nothing
-    CMP R10, R3
-    JZ not_increasing
-
-    ADD R10, 1
-
-    MOVB [R2], R10
-
-    not_increasing:
-      POP R3
-      POP R2
-      POP R1
-
-    JMP return_handle
-
-  energy_decrease:
-    ;R10 is the register to store the current energy
-    PUSH R1
-    PUSH R2
-    PUSH R3
-
-    MOV R2, ENERGY_LEVEL
-    MOV R3, ENERGY_MIN_LEVEL
-
-    CMP R4, R0
-    JZ not_decreasing
-
-    ; if energy is at min level, do nothing
-    CMP R10, R3
-    JZ not_decreasing
-
-    SUB R10, 1
-
-    MOVB [R2], R10
-
-    not_decreasing:
-      POP R3
-      POP R2
-      POP R1
-
-    JMP return_handle
-=======
     CMP R4, R0
     JZ return_handle
 
@@ -438,7 +377,6 @@ handle_keyboard:
     ;save energy value
     MOV R2, SET_ENERGY
     MOV [R2], R10
->>>>>>> Stashed changes
 
   return_handle:
     ;save key for later checks
