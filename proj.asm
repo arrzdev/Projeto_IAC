@@ -80,7 +80,6 @@ ENTITIE_MARIO:
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
 
-
 ENTITIE_GOOMBA:
   WORD 30 ;default x
   WORD 0 ;default y
@@ -247,6 +246,12 @@ handle_keyboard:
     CMP R0, KEY_DOWN
     JZ move_goomba_down
 
+    CMP R0, KEY_ENERGY_UP
+    JZ energy_increase
+
+    CMP R0, KEY_ENERGY_DOWN
+    JZ energy_decrease
+
     ;the key doesn't have any action associated
     JMP return_handle
 
@@ -322,7 +327,47 @@ handle_keyboard:
 
     CALL check_bottom_boundary
     CALL movement
+    JMP return_handle
 
+  energy_increase:
+    CMP R4, R0
+    JZ return_handle
+
+    ;get max energy level
+    MOV R1, MAX_ENERGY
+
+    ;if energy is at max level, do nothing 
+    ;R10 stores the current energy
+    CMP R10, R1
+    JZ return_handle
+
+    ;otherwise
+    ADD R10, 1
+
+    ;save energy value
+    MOV R2, SET_ENERGY
+    MOV [R2], R10
+
+    JMP return_handle
+
+  energy_decrease:
+    CMP R4, R0
+    JZ return_handle
+
+    ;get max energy level
+    MOV R1, MIN_ENERGY
+
+    ;if energy is at min level, do nothing 
+    ;R10 stores the current energy
+    CMP R10, R1
+    JZ return_handle
+
+    ;otherwise
+    ADD R10, -1
+
+    ;save energy value
+    MOV R2, SET_ENERGY
+    MOV [R2], R10
 
   return_handle:
     ;save key for later checks
@@ -339,8 +384,8 @@ listen_keyboard_line:
   PUSH  R3
   PUSH  R5
   
-	MOV  R2, KEY_LIN ;adress of keyboard lines
-	MOV  R3, KEY_COL ;adress of keyboard columns
+	MOV  R2, SET_KEY_LINE ;adress of keyboard lines
+  MOV  R3, READ_KEY_COL ;adress of keyboard columns
 	MOV  R5, MASK ;isolate the 4 dominant bits 
 	MOVB [R2], R6 ;set the line to be read
 	MOVB R0, [R3] ;read the column pressed
@@ -489,7 +534,6 @@ check_bottom_boundary:
     POP R2
     POP R1
     RET
-
 
 stop_movement:
   MOV R7, 0 ;set direction to 0
