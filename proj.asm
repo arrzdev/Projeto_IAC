@@ -84,7 +84,7 @@ ENTITY_MARIO:
   
   ;sprite #0 (mario looking forward)
   WORD 0, RED, RED, RED, 0		
-  WORD 0, NUDE, NUDE, NUDE, 0
+  WORD 0, BLACK, NUDE, BLACK, 0
   WORD RED, BLUE, RED, BLUE, RED
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
