@@ -1,3 +1,5 @@
+; MEMORY ADDRESSES
+
 ;print
 SET_X  EQU 600CH
 SET_Y  EQU 600AH
@@ -130,6 +132,11 @@ start:
     CALL handle_keyboard
     JMP keyboard_handler_loop
 
+; function to render the sprites
+; loops through all the lines and set each pixel at a time with the colors from the sprite
+; the x and y positions are set by the sprite itself
+; the sprite is set by the sprite index
+
 render_sprite:
   PUSH R0 ;register to temp store values
   PUSH R1 ;x
@@ -195,6 +202,8 @@ render_sprite:
   POP R0
   RET
 
+; function to render or remove a pixel, its color is given by index R3
+; R8 is set to "write" (1) or "delete" (0)
 render_pixel:
   PUSH R4
 
@@ -214,6 +223,7 @@ render_pixel:
   POP R4
   RET
 
+; loop to listen to keyboard and execute function accordingly
 handle_keyboard:
   PUSH R0 ;key that was listened / current background index
   PUSH R1 ;max background index
@@ -224,6 +234,7 @@ handle_keyboard:
 
   MOV R6, 1 ;first line to test 
 
+  ; loop through all the lines to check if any key was pressed
   test_line:
     CALL listen_keyboard_line
     CMP R0, -1
@@ -263,6 +274,9 @@ handle_keyboard:
     ;the key doesn't have any action associated
     JMP return_handle
 
+  ; function to move mario left
+  ; by pressing the key "0", mario moves left
+  ; it enables you to keep pressing the key to continue moving
   move_mario_left:
     ;get current background index
     MOV R0, [SET_BACKGROUND]
@@ -292,6 +306,10 @@ handle_keyboard:
     CALL movement
     JMP return_handle
 
+
+  ; function to move mario right
+  ; by pressing the key "2", mario moves right
+  ; it enables you to keep pressing the key to continue moving
   move_mario_right:
     ;get current background index
     MOV R0, [SET_BACKGROUND]
@@ -322,6 +340,9 @@ handle_keyboard:
     CALL movement
     JMP return_handle
 
+  ; function to move goomba down
+  ; by pressing "3", mario moves down
+  ; it only moves one pixel at a time
   move_goomba_down:
     ;if last action was goomba down, skip it
     CMP R4, R0;
@@ -337,6 +358,9 @@ handle_keyboard:
     CALL movement
     JMP return_handle
 
+  ; function to increase energy level
+  ; by pressing "4", energy increases by 1
+  ; it only increases 1H at a time
   energy_increase:
     CMP R4, R0
     JZ return_handle
@@ -358,6 +382,9 @@ handle_keyboard:
 
     JMP return_handle
 
+  ; function to decrease energy level
+  ; by pressing "5", energy decreases by 1
+  ; it only decreases 1H at a time
   energy_decrease:
     CMP R4, R0
     JZ return_handle
@@ -387,6 +414,9 @@ handle_keyboard:
     POP R0
     RET
 
+; function to listen to keyboard line
+; if key is pressed is moved to register R0
+; if key is not pressed, R0 is set to -1
 listen_keyboard_line:
   PUSH  R2
   PUSH  R3
@@ -413,6 +443,9 @@ listen_keyboard_line:
     POP	R2
     RET
 
+; function that represents sprite movement
+; R7 represents the momentum of the sprite
+; R8 represents the action of "writing" (1) or "deleting" (0) the sprite pixels
 movement:
   PUSH R1
   PUSH R2
@@ -462,6 +495,8 @@ movement:
     POP R1
     RET
 
+; function to check if sprite is allowed to move right
+; if it is not allowed, R7 is set to 0 (CALL stop_movement)
 check_right_boundary:
   PUSH R1
   PUSH R5
@@ -488,6 +523,8 @@ check_right_boundary:
     POP R1
     RET
 
+; function to check if sprite is allowed to move left
+; if it is not allowed, R7 is set to 0 (CALL stop_movement)
 check_left_boundary:
   PUSH R1
   PUSH R5
@@ -509,6 +546,8 @@ check_left_boundary:
     POP R1
     RET
 
+; function to check if sprite is allowed to move down
+; if it is not allowed, R7 is set to 0 (CALL stop_movement)
 check_bottom_boundary:
   PUSH R1
   PUSH R2
@@ -547,6 +586,7 @@ stop_movement:
   MOV R7, 0 ;set direction to 0
   RET
 
+; function to convert keyboard key to its value (0-F)
 convert_to_key:
   PUSH R3
   PUSH R4
@@ -588,6 +628,7 @@ normalize_index:
     
   RET
 
+; function to render mario as idle (looking foward)
 idle_mario:
   PUSH R3
   PUSH R4
