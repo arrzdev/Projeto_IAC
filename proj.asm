@@ -18,9 +18,14 @@ MAX_SCREEN_HEIGHT EQU 32
 ;audio
 PLAY_SOUND EQU 0605AH
 
+;energy display
+SET_ENERGY EQU 0A000H ;address of energy display (POUT-1)
+MAX_ENERGY EQU 0100H
+MIN_ENERGY EQU 0H
+
 ;keyboard
-KEY_LIN EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
-KEY_COL EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
+SET_KEY_LINE EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
+READ_KEY_COL EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
 KEY_MAX_LIN EQU 8		; linha a testar (4ª linha)
 MASK EQU 0FH	
 
@@ -28,6 +33,8 @@ MASK EQU 0FH
 KEY_LEFT EQU 00H
 KEY_RIGHT EQU 02H
 KEY_DOWN EQU 03H
+KEY_ENERGY_UP EQU 04H
+KEY_ENERGY_DOWN EQU 05H
 
 ;colors
 ;kinda nude 0FFAAH
