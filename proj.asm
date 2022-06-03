@@ -114,19 +114,15 @@ setup:
   MOV [CLEAR_SCREEN], R1 ;clear pixels on screen
   MOV R1, 0 ;background 0
   MOV [SET_BACKGROUND], R1 ;set background
-
-  MOV R7, +1; value to increment when moving
-  ;initial set for momentum
   
 start:
-  ;render initial entities
-  MOV R8, 1 ;set action to "write"
-
-  ;render mario
+  ;render initial entities:
+  ;render idling mario
   CALL idle_mario
 
   ;render goomba
-  MOV R3, ENTITIE_GOOMBA
+  MOV R8, 1 ;set action to "write"
+  MOV R3, ENTITIE_GOOMBA ;set entitie to goomba
   CALL render_sprite
 
   ;start keyboard listen
@@ -224,21 +220,26 @@ handle_keyboard:
   PUSH R6 ;line to test / sprite to render
   PUSH R7 ;direction to move
 
-  MOV R1, 8 ;set max background index
+  MOV R1, 8 ;max line / max background index
 
   MOV R6, 1 ;first line to test 
 
   test_line:
     CALL listen_keyboard_line
-    CMP R0, -1 ;if not pressed
-    JNZ handle_actions
-    ROL R6, 1
+    CMP R0, -1
+    JNZ handle_actions ;if a key is being pressed
 
-    ;set idle mario animation when not moving
+    ;otherwise 
+    ROL R6, 1 ;test next line by rotating to the left
+
+    ;set mario idle animation when not moving
     CALL idle_mario
 
-    ;if there isn't any key pressed
-    ;reset last key
+    ;check if we already listened the whole keyboard
+    CMP R6, R1
+    JNZ test_line; R6 != 8, just continue listening the keyboard lines ahead
+
+    ;otherwise: reset last key pressed and then start listening from begining
     MOV R4, -1
 
     JMP test_line
@@ -377,7 +378,7 @@ handle_keyboard:
     MOV [R2], R10
 
   return_handle:
-    ;save key for later checks
+    ;save pressed key for later checks
     MOV R4, R0 ;save it on register R4
 
     POP R7
