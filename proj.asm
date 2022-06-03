@@ -216,6 +216,7 @@ handle_keyboard:
   PUSH R0 ;key that was listened / current background index
   PUSH R1 ;max background index
   PUSH R6 ;line to test / sprite to render
+  PUSH R7 ;direction to move
 
   MOV R1, 8 ;set max background index
 
@@ -226,6 +227,9 @@ handle_keyboard:
     CMP R0, -1 ;if not pressed
     JNZ handle_actions
     ROL R6, 1
+
+    ;set idle mario animation when not moving
+    CALL idle_mario
 
     ;if there isn't any key pressed
     ;reset last key
@@ -247,16 +251,9 @@ handle_keyboard:
     JMP return_handle
 
   move_mario_left:
-    ;set action entity as mario
-    MOV R3, ENTITIE_MARIO
-
-    ;set sprite to render (left)
-    MOV R6, 1
-    MOV [R3+4], R6
-
     ;get current background index
     MOV R0, [SET_BACKGROUND]
-    CMP R0, 0
+    CMP R0, 0 ;0 is the lowest background index
     JZ cycle_background_left
 
     ADD R0, -1; increment background index
@@ -268,21 +265,21 @@ handle_keyboard:
     set_background_left:
       MOV [SET_BACKGROUND], R0 ;set new background
 
-    ;move
-    MOV R7, -1 ;set momentum to -1
+    ;move:
+    ;set action entity as mario
+    MOV R3, ENTITIE_MARIO
+
+    ;set sprite to render (left)
+    MOV R6, 1
+    MOV [R3+4], R6
+
+    MOV R7, -1 ;set direction to -1
 
     CALL check_left_boundary
     CALL movement
     JMP return_handle
 
   move_mario_right:
-    ;set action entity as mario
-    MOV R3, ENTITIE_MARIO
-
-    ;set sprite to render (right)
-    MOV R6, 2
-    MOV [R3+4], R6
-
     ;get current background index
     MOV R0, [SET_BACKGROUND]
     CMP R1, R0
@@ -297,8 +294,16 @@ handle_keyboard:
     set_background_right:
       MOV [SET_BACKGROUND], R0 ;set new background
 
-    ;move
-    MOV R7, +1 ;set momentum to +1
+    ;move:
+
+    ;set action entity as mario
+    MOV R3, ENTITIE_MARIO
+
+    ;set sprite to render (right)
+    MOV R6, 2
+    MOV [R3+4], R6
+
+    MOV R7, +1 ;set direction to +1
 
     CALL check_right_boundary
     CALL movement
@@ -313,7 +318,7 @@ handle_keyboard:
     MOV R3, ENTITIE_GOOMBA
 
     ;move
-    MOV R7, 2 ;set momentum as 2 (special value for falling entities)
+    MOV R7, 2 ;set direction as 2 (special value for falling entities)
 
     CALL check_bottom_boundary
     CALL movement
@@ -323,6 +328,7 @@ handle_keyboard:
     ;save key for later checks
     MOV R4, R0 ;save it on register R4
 
+    POP R7
     POP R6
     POP R1
     POP R0
@@ -354,12 +360,12 @@ listen_keyboard_line:
     POP	R2
     RET
 
-; R7 = 0 -> stay in the same position
-; R7 = +1 -> move right
-; R7 = -1 -> move left
 movement:
   PUSH R1
   PUSH R2
+  PUSH R6
+  PUSH R7
+  PUSH R8
 
   CMP R7, 0
   JZ return_movement ;if R7 is set to 0, then don't move
@@ -396,6 +402,9 @@ movement:
   CALL render_sprite ;render sprite with action setted previously
 
   return_movement:
+    POP R8
+    POP R7
+    POP R6
     POP R2
     POP R1
     RET
@@ -427,6 +436,7 @@ check_right_boundary:
     RET
 
 check_left_boundary:
+  PUSH R1
   PUSH R5
 
   ;get entity X postion
@@ -443,6 +453,7 @@ check_left_boundary:
 
   return_check_left:
     POP R5
+    POP R1
     RET
 
 check_bottom_boundary:
@@ -481,7 +492,7 @@ check_bottom_boundary:
 
 
 stop_movement:
-  MOV R7, 0 ;set momentum to 0
+  MOV R7, 0 ;set direction to 0
   RET
 
 convert_to_key:
@@ -526,18 +537,20 @@ normalize_index:
   RET
 
 idle_mario:
+  PUSH R3
   PUSH R4
+  PUSH R6
+  PUSH R8
 
   ;set action entity as mario
   MOV R3, ENTITIE_MARIO
 
-  ;delete old sprite if not idling
-  
   ;get selected sprite
   MOV R4, [R3+4] ;
   CMP R4, 0 ;check if mario is set to idle
   JZ return_idle_mario
 
+  ;delete old sprite if not idling
   MOV R8, 0 ;set action to "delete"
   CALL render_sprite
 
@@ -550,8 +563,8 @@ idle_mario:
   CALL render_sprite
 
   return_idle_mario:
+    POP R8
+    POP R6
     POP R4
+    POP R3
     RET
-
-end:  
-  JMP end
