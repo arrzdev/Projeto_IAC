@@ -1,9 +1,22 @@
-;print
-SET_X  EQU 600CH
-SET_Y  EQU 600AH
+; *********************************************************************************
+; * -- GRUPO 17 --
+; * Entrega intermédia
+; 
+; * André Santos - 103597
+; * João Correia - 102843
+; * Margarida Chinopa - 102991
+; *********************************************************************************
 
-SET_PIXEL  EQU 6012H
-DELETE_WARNING  EQU 6040H
+;**********************************************************************************
+;-----------------------------------CONSTANTS--------------------------------------
+;**********************************************************************************
+
+;print
+SET_X EQU 600CH
+SET_Y EQU 600AH
+
+SET_PIXEL EQU 6012H
+DELETE_WARNING EQU 6040H
 
 ;screen
 CLEAR_SCREEN EQU 6002H
@@ -24,9 +37,9 @@ MAX_ENERGY EQU 0100H
 MIN_ENERGY EQU 0H
 
 ;keyboard
-SET_KEY_LINE EQU 0C000H	; endereço das linhas do teclado (periférico POUT-2)
-READ_KEY_COL EQU 0E000H	; endereço das colunas do teclado (periférico PIN)
-KEY_MAX_LIN EQU 8		; linha a testar (4ª linha)
+SET_KEY_LINE EQU 0C000H ;address of keyboard lines (POUT-2)
+READ_KEY_COL EQU 0E000H ;adress of keyboard colums (PIN)
+KEY_MAX_LIN EQU 8 ;max keyboard line
 MASK EQU 0FH	
 
 ;keys
@@ -37,14 +50,16 @@ KEY_ENERGY_UP EQU 04H
 KEY_ENERGY_DOWN EQU 05H
 
 ;colors
-;kinda nude 0FFAAH
-;black 0F000H
 BLACK EQU 0F000H
 RED EQU 0FF00H
 BROWN EQU 0FA52H
 NUDE EQU 0FFB5H
 BLUE EQU 0F06FH
 WHITE EQU 0FFFFH
+
+;**********************************************************************************
+;-------------------------------------DADOS----------------------------------------
+;**********************************************************************************
 
 ;set table address
 PLACE 1000H; address where table starts
@@ -54,8 +69,9 @@ pilha:
 
 INITIAL_SP:
 
-ENTITIE_MARIO:
-  ;entity position  
+
+ENTITY_MARIO:
+  ;entity position
   WORD 30 ;default x
   WORD 25 ;default y
 
@@ -66,9 +82,9 @@ ENTITIE_MARIO:
   WORD 5 ;lenght value of caracter
   WORD 5 ;height value of caracter
   
-  ;sprite #0 (mario staying still)
+  ;sprite #0 (mario looking forward)
   WORD 0, RED, RED, RED, 0		
-  WORD 0, BLACK, NUDE, BLACK, 0
+  WORD 0, NUDE, NUDE, NUDE, 0
   WORD RED, BLUE, RED, BLUE, RED
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
@@ -87,7 +103,8 @@ ENTITIE_MARIO:
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
 
-ENTITIE_GOOMBA:
+
+ENTITY_GOOMBA:
   WORD 30 ;default x
   WORD 0 ;default y
 
@@ -105,7 +122,10 @@ ENTITIE_GOOMBA:
   WORD 0, BLACK, NUDE, BLACK, 0
   WORD 0, NUDE, NUDE, NUDE, 0
 
-;codigo
+;**********************************************************************************
+;--------------------------------------CODE----------------------------------------
+;**********************************************************************************
+
 PLACE  0
 
 setup:
@@ -117,12 +137,13 @@ setup:
   
 start:
   ;render initial entities:
+
   ;render idling mario
   CALL idle_mario
 
   ;render goomba
   MOV R8, 1 ;set action to "write"
-  MOV R3, ENTITIE_GOOMBA ;set entitie to goomba
+  MOV R3, ENTITY_GOOMBA ;set entity to goomba
   CALL render_sprite
 
   ;start keyboard listen
@@ -130,6 +151,14 @@ start:
     CALL handle_keyboard
     JMP keyboard_handler_loop
 
+; **********************************************************************
+; RENDER_SPRITE :
+;   - function to render the sprites
+;   - loops through all the lines and set each pixel at a time with the 
+; colors from the sprite
+;   - the x and y positions to start rendering from are grabbed from the entitie
+;   - the sprite is set by the sprite index also stored on the entity table
+; **********************************************************************
 render_sprite:
   PUSH R0 ;register to temp store values
   PUSH R1 ;x
@@ -144,7 +173,7 @@ render_sprite:
   MOV R1, [R3] ;x
   MOV R2, [R3+2] ;y
 
-  ;get selected sprite
+  ;get selected sprite index
   MOV R7, [R3+4]
 
   ;get entity length
@@ -195,11 +224,19 @@ render_sprite:
   POP R0
   RET
 
+; **********************************************************************
+; RENDER_PIXEL :
+;   - function to render or remove a pixel, its color is given by R3
+;   - R8 is either "write" (1) or "delete" (0)
+; **********************************************************************
 render_pixel:
   PUSH R4
+    
+  ;if action is set to 0 then delete pixel
+  CMP R8, 0
+  JZ delete_pixel
 
-  CMP R8, 0 ;check if action is "write"
-  JZ delete_pixel ;if 0 then delete pixel
+  ;otherwise
   MOV R4, [R3] ;get pixel color from index R3
   JMP set_pixel
 
@@ -214,34 +251,43 @@ render_pixel:
   POP R4
   RET
 
+; **********************************************************************
+; HANDLE_KEYBOARD :
+;  - loop until a key is pressed on keyboard and execute function accordingly
+; **********************************************************************
 handle_keyboard:
   PUSH R0 ;key that was listened / current background index
-  PUSH R1 ;max background index
+  PUSH R1 ;max line / max background index
   PUSH R6 ;line to test / sprite to render
   PUSH R7 ;direction to move
 
-  MOV R1, 8 ;max line / max background index
+  MOV R1, 8 ;max line and max background are both 8
 
-  MOV R6, 1 ;first line to test 
+  MOV R6, 1 ;start by listening on line 1
 
+  ;loop through all the lines to check if any key was pressed
   test_line:
     CALL listen_keyboard_line
+    
+    ;if a key is being pressed
     CMP R0, -1
-    JNZ handle_actions ;if a key is being pressed
+    JNZ handle_actions
 
     ;otherwise 
     ROL R6, 1 ;test next line by rotating to the left
 
-    ;set mario idle animation when not moving
+    ;render mario idle sprite when no key is being pressed
     CALL idle_mario
 
     ;check if we already listened the whole keyboard
     CMP R6, R1
     JNZ test_line; R6 != 8, just continue listening the keyboard lines ahead
 
-    ;otherwise: reset last key pressed and then start listening from begining
+    ;otherwise 
+    ;reset last key pressed
     MOV R4, -1
 
+    ;start listening from begining
     JMP test_line
   
   handle_actions:
@@ -263,6 +309,12 @@ handle_keyboard:
     ;the key doesn't have any action associated
     JMP return_handle
 
+; **********************************************************************
+; MOVE_MARIO_LEFT :
+;  - function to move mario left
+;  - by pressing the key "0", mario moves left
+;  - it enables you to keep pressing the key to continue moving
+; **********************************************************************
   move_mario_left:
     ;get current background index
     MOV R0, [SET_BACKGROUND]
@@ -280,18 +332,24 @@ handle_keyboard:
 
     ;move:
     ;set action entity as mario
-    MOV R3, ENTITIE_MARIO
+    MOV R3, ENTITY_MARIO
 
     ;set sprite to render (left)
     MOV R6, 1
     MOV [R3+4], R6
 
-    MOV R7, -1 ;set direction to -1
+    MOV R7, -1 ;set direction to the left (-1)
 
     CALL check_left_boundary
     CALL movement
     JMP return_handle
 
+; **********************************************************************
+; MOVE_MARIO_RIGHT :
+;  - function to move mario right
+;  - by pressing the key "2", mario moves right
+;  - it enables you to keep pressing the key to continue moving
+; **********************************************************************
   move_mario_right:
     ;get current background index
     MOV R0, [SET_BACKGROUND]
@@ -308,27 +366,32 @@ handle_keyboard:
       MOV [SET_BACKGROUND], R0 ;set new background
 
     ;move:
-
     ;set action entity as mario
-    MOV R3, ENTITIE_MARIO
+    MOV R3, ENTITY_MARIO
 
     ;set sprite to render (right)
     MOV R6, 2
     MOV [R3+4], R6
 
-    MOV R7, +1 ;set direction to +1
+    MOV R7, +1 ;set direction to the right (+1)
 
     CALL check_right_boundary
     CALL movement
     JMP return_handle
 
+; **********************************************************************
+; MOVE_GOOMBA_DOWN :
+;  - function to move goomba down
+;  - by pressing "3", goomba moves down
+;  - it only moves one pixel at a time
+; **********************************************************************
   move_goomba_down:
     ;if last action was goomba down, skip it
     CMP R4, R0;
     JZ return_handle
 
     ;set action entity as goomba
-    MOV R3, ENTITIE_GOOMBA
+    MOV R3, ENTITY_GOOMBA
 
     ;move
     MOV R7, 2 ;set direction as 2 (special value for falling entities)
@@ -337,7 +400,14 @@ handle_keyboard:
     CALL movement
     JMP return_handle
 
+; **********************************************************************
+; ENERGY_INCREASE :
+;  - function to increase energy level
+;  - by pressing "4", energy increases by 1
+;  - it only increases 1 at a time
+; **********************************************************************
   energy_increase:
+    ;if last action was energy increase, skip it
     CMP R4, R0
     JZ return_handle
 
@@ -350,6 +420,8 @@ handle_keyboard:
     JZ return_handle
 
     ;otherwise
+
+    ;if 
     ADD R10, 1
 
     ;save energy value
@@ -358,7 +430,14 @@ handle_keyboard:
 
     JMP return_handle
 
+; **********************************************************************
+; ENERGY_DECREASE :
+;   - function to decrease energy level
+;   - by pressing "5", energy decreases by 1
+;   - it only decreases 1 at a time
+; **********************************************************************
   energy_decrease:
+    ;if last action was energy decrease, skip it
     CMP R4, R0
     JZ return_handle
 
@@ -366,8 +445,7 @@ handle_keyboard:
     MOV R1, MIN_ENERGY
 
     ;if energy is at min level, do nothing 
-    ;R10 stores the current energy
-    CMP R10, R1
+    CMP R10, R1 ;R10 stores the current energy
     JZ return_handle
 
     ;otherwise
@@ -379,28 +457,37 @@ handle_keyboard:
 
   return_handle:
     ;save pressed key for later checks
-    MOV R4, R0 ;save it on register R4
+    MOV R4, R0
 
     POP R7
     POP R6
     POP R1
     POP R0
     RET
-
+    
+; **********************************************************************
+; LISTEN_KEYBOARD_LINE :
+;  - function to listen to keyboard line
+;  - if key is pressed is moved to register R0
+;  - if key is not pressed, R0 is set to -1
+; **********************************************************************
 listen_keyboard_line:
-  PUSH  R2
-  PUSH  R3
-  PUSH  R5
+  PUSH R2
+  PUSH R3
+  PUSH R5
   
-	MOV  R2, SET_KEY_LINE ;adress of keyboard lines
-  MOV  R3, READ_KEY_COL ;adress of keyboard columns
-	MOV  R5, MASK ;isolate the 4 dominant bits 
-	MOVB [R2], R6 ;set the line to be read
-	MOVB R0, [R3] ;read the column pressed
-	AND  R0, R5 ;isolate the 4 dominant bits
+  MOV R2, SET_KEY_LINE ;adress of keyboard lines
+  MOV R3, READ_KEY_COL ;adress of keyboard columns
+  MOV R5, MASK ;isolate the 4 dominant bits 
+  MOVB [R2], R6 ;set the line to be read
+  MOVB R0, [R3] ;read the column pressed
+  AND R0, R5 ;isolate the 4 dominant bits
 
-  CMP R0, 0 ;check if there isn't any key pressed
+  ;if there isn't any key being pressed
+  CMP R0, 0
   JZ set_not_found
+
+  ;otherwise
   CALL convert_to_key ;convert column and line to key
   JMP return_key
 
@@ -413,6 +500,12 @@ listen_keyboard_line:
     POP	R2
     RET
 
+; **********************************************************************
+; MOVEMENT :
+;  - function that represents sprite movement
+;  - R7 represents the momentum of the sprite
+;  - R8 represents the action of "writing" (1) or "deleting" (0) the sprite pixels
+; **********************************************************************
 movement:
   PUSH R1
   PUSH R2
@@ -420,39 +513,45 @@ movement:
   PUSH R7
   PUSH R8
 
-  CMP R7, 0
-  JZ return_movement ;if R7 is set to 0, then don't move
+  CMP R7, 0 ;if direction is set to 0, don't move
+  JZ return_movement
 
   ;otherwise start by deleting the old sprite
   MOV R8, 0 ;set action to "delete"
   CALL render_sprite ; delete sprite with action setted previously
-  
-  ;get entity position
-  MOV R1, [R3] ;x 
-  MOV R2, [R3+2] ;y
 
   ;check if we have the special value for falling entities (2)
   CMP R7, 2
   JZ vertical_move
 
   ;horizontal movement
-  ADD R1, R7 ;move entity one pixel to setted direction
-  JMP update_position_scope
+  MOV R1, [R3] ;get entity x postion
+  ADD R1, R7 ;add direction to x position (1 or -1)
+  ;update entity x
+  MOV [R3], R1
+  JMP render_new_position
 
+  ;vertical movement
   vertical_move:
-    ;play sound
-    MOV R6, 0 ;audio with index 0
+    ;play sound #0
+    MOV R6, 0
     MOV [PLAY_SOUND], R6
-    
-    ADD R2, 1 ;move entity one pixel down
+
+    MOV R2, [R3+2] ;get entity y postion
+    ADD R2, 1 ;add 1 to y position
+    ;update entity y
+    MOV [R3+2], R2
+    JMP render_new_position
 
   ;update position on entity scope
   update_position_scope:
     MOV [R3], R1 ;x
     MOV [R3+2], R2 ;y
 
-  MOV R8, 1 ;set action to "write"
-  CALL render_sprite ;render sprite with action setted previously
+  ;render new-position
+  render_new_position:
+    MOV R8, 1 ;set action to "write"
+    CALL render_sprite
 
   return_movement:
     POP R8
@@ -462,6 +561,11 @@ movement:
     POP R1
     RET
 
+; **********************************************************************
+; CHECK_RIGHT_BOUNDARY :
+;  - function to check if sprite is allowed to move right
+;  - if it isn't allowed, stop movement is called
+; **********************************************************************
 check_right_boundary:
   PUSH R1
   PUSH R5
@@ -488,6 +592,11 @@ check_right_boundary:
     POP R1
     RET
 
+; **********************************************************************
+; CHECK_LEFT_BOUNDARY :
+;  - function to check if sprite is allowed to move left
+;  - if it isn't allowed, stop movement is called
+; **********************************************************************
 check_left_boundary:
   PUSH R1
   PUSH R5
@@ -509,6 +618,11 @@ check_left_boundary:
     POP R1
     RET
 
+; **********************************************************************
+; CHECK_BOTTOM_BOUNDARY :
+;  - function to check if sprite is allowed to move down
+;  - if it isn't allowed, stop movement is called
+; **********************************************************************
 check_bottom_boundary:
   PUSH R1
   PUSH R2
@@ -543,16 +657,23 @@ check_bottom_boundary:
     POP R1
     RET
 
+; **********************************************************************
+; STOP_MOVEMENT :
+;  - function to set direction as 0, stoping the movement function
+; **********************************************************************
 stop_movement:
   MOV R7, 0 ;set direction to 0
   RET
 
+; **********************************************************************
+; CONVERT_TO_KEY :
+;  - function to convert column and line to keyboard key in hexadecimal
+; **********************************************************************
 convert_to_key:
   PUSH R3
   PUSH R4
   PUSH R5
 
-  ;first we need to normalize both line and column
   ;normalize column
   CALL normalize_index
   MOV R5, R9 ;save the normalized column value
@@ -577,6 +698,10 @@ convert_to_key:
   POP R3
   RET
 
+; **********************************************************************
+; NORMALIZE_INDEX :
+;  - function to normalize index's (1, 2, 4, 8) -> (0,1,2,3)
+; **********************************************************************
 normalize_index:
   MOV R9, -1 ;init counter as -1
 
@@ -588,6 +713,10 @@ normalize_index:
     
   RET
 
+; **********************************************************************
+; IDLE_MARIO :
+;  - function to render mario idle sprite
+; **********************************************************************
 idle_mario:
   PUSH R3
   PUSH R4
@@ -595,14 +724,17 @@ idle_mario:
   PUSH R8
 
   ;set action entity as mario
-  MOV R3, ENTITIE_MARIO
+  MOV R3, ENTITY_MARIO
 
   ;get selected sprite
   MOV R4, [R3+4] ;
-  CMP R4, 0 ;check if mario is set to idle
+
+  ;if mario is already idling return function
+  CMP R4, 0 
   JZ return_idle_mario
 
-  ;delete old sprite if not idling
+  ;otherwise
+  ;delete old sprite
   MOV R8, 0 ;set action to "delete"
   CALL render_sprite
 
