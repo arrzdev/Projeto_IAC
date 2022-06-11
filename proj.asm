@@ -411,6 +411,15 @@ handle_keyboard:
     CMP R4, R0
     JZ return_handle
 
+    PUSH R6
+    PUSH R7
+    PUSH R8
+
+    MOV R6, 9
+    MOV R7, 10H
+
+    MOV R8, R10
+
     ;get max energy level
     MOV R1, MAX_ENERGY
 
@@ -419,14 +428,27 @@ handle_keyboard:
     CMP R10, R1
     JZ return_handle
 
+    MOD R8, R7 ;R8 is the first digit of the current energy (R10)
+
+    CMP R8, R6 ;if energy last digit is 9 add 6, convert hexadecimal to decimal
+    JNZ increase_one ;else only add 1
+
+    increase_six:
+      ADD R10, 6
+
     ;otherwise
+    increase_one:     
+      ADD R10, 1
+      JMP set_increase_energy
 
-    ;if 
-    ADD R10, 1
+    set_increase_energy:
+      ;save energy value
+      MOV R2, SET_ENERGY
+      MOV [R2], R10
 
-    ;save energy value
-    MOV R2, SET_ENERGY
-    MOV [R2], R10
+    POP R8
+    POP R7
+    POP R6
 
     JMP return_handle
 
@@ -441,19 +463,41 @@ handle_keyboard:
     CMP R4, R0
     JZ return_handle
 
-    ;get max energy level
+    PUSH R7
+    PUSH R8
+
+    MOV R7, 10H
+
+    MOV R8, R10
+
+    ;get min energy level
     MOV R1, MIN_ENERGY
 
     ;if energy is at min level, do nothing 
-    CMP R10, R1 ;R10 stores the current energy
+    ;R10 stores the current energy
+    CMP R10, R1
     JZ return_handle
 
-    ;otherwise
-    ADD R10, -1
+    MOD R8, R7 ;R8 is the first digit of the current energy (R10)
 
-    ;save energy value
-    MOV R2, SET_ENERGY
-    MOV [R2], R10
+    CMP R8, 0 ;if energy last digit is 0 sub 6, convert hexadecimal to decimal
+    JNZ decrease_one ;else only add 1
+
+    decrease_six:
+      SUB R10, 6
+
+    ;otherwise
+    decrease_one:     
+      SUB R10, 1
+      JMP set_decrease_energy
+
+    set_decrease_energy:
+      ;save energy value
+      MOV R2, SET_ENERGY
+      MOV [R2], R10
+
+    POP R8
+    POP R7
 
   return_handle:
     ;save pressed key for later checks
