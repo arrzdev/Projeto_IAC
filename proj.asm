@@ -258,8 +258,10 @@ render_pixel:
 handle_keyboard:
   PUSH R0 ;key that was listened / current background index
   PUSH R1 ;max line / max background index
-  PUSH R6 ;line to test / sprite to render
-  PUSH R7 ;direction to move
+  PUSH R2 ;constant to convert hext to decimal
+  PUSH R6 ;line to test / sprite to render / constant to convert hext to decimal
+  PUSH R7 ;direction to move / constant to convert hext to decimal
+  PUSH R8 ;stores R10 to convert from hex to decimal
 
   MOV R1, 8 ;max line and max background are both 8
 
@@ -411,10 +413,6 @@ handle_keyboard:
     CMP R4, R0
     JZ return_handle
 
-    PUSH R6
-    PUSH R7
-    PUSH R8
-
     MOV R6, 9
     MOV R7, 10H
 
@@ -428,6 +426,8 @@ handle_keyboard:
     CMP R10, R1
     JZ return_handle
 
+    ; Logic for units
+
     MOD R8, R7 ;R8 is the first digit of the current energy (R10)
 
     CMP R8, R6 ;if energy last digit is 9 add 6, convert hexadecimal to decimal
@@ -437,18 +437,24 @@ handle_keyboard:
       ADD R10, 6
 
     ;otherwise
-    increase_one:     
+    increase_one: 
       ADD R10, 1
-      JMP set_increase_energy
+
+    ; Logic for tens
+    MOV R7, 0A0H ;when R10 is 99H and you increase +1 (6 in this case)
+
+    CMP R10, R7 ;if energy tens digit is 9 add 60, convert hexadecimal to decimal
+    JNZ set_increase_energy ;else only add 1
+
+    increase_sixty:
+      MOV R7, 60H
+      ADD R10, R7
+
 
     set_increase_energy:
       ;save energy value
       MOV R2, SET_ENERGY
       MOV [R2], R10
-
-    POP R8
-    POP R7
-    POP R6
 
     JMP return_handle
 
@@ -463,9 +469,6 @@ handle_keyboard:
     CMP R4, R0
     JZ return_handle
 
-    PUSH R7
-    PUSH R8
-
     MOV R7, 10H
 
     MOV R8, R10
@@ -478,33 +481,40 @@ handle_keyboard:
     CMP R10, R1
     JZ return_handle
 
-    MOD R8, R7 ;R8 is the first digit of the current energy (R10)
+    MOV R1, MAX_ENERGY
+    CMP R10, R1
+    JNZ not_decrease_edgecase
 
-    CMP R8, 0 ;if energy last digit is 0 sub 6, convert hexadecimal to decimal
-    JNZ decrease_one ;else only add 1
+    MOV R10, 99H
+    JMP set_decrease_energy
 
-    decrease_six:
-      SUB R10, 6
+    not_decrease_edgecase:
+      MOD R8, R7 ;R8 is the first digit of the current energy (R10)
 
-    ;otherwise
-    decrease_one:     
-      SUB R10, 1
-      JMP set_decrease_energy
+      CMP R8, 0 ;if energy last digit is 0 sub 6, convert hexadecimal to decimal
+      JNZ decrease_one ;else only add 1
+
+      decrease_six:
+        MOV R8, R10
+        SUB R10, 6
+
+      ;otherwise
+      decrease_one:   
+        SUB R10, 1
 
     set_decrease_energy:
       ;save energy value
       MOV R2, SET_ENERGY
       MOV [R2], R10
 
-    POP R8
-    POP R7
-
   return_handle:
     ;save pressed key for later checks
     MOV R4, R0
 
+    POP R8
     POP R7
     POP R6
+    POP R2
     POP R1
     POP R0
     RET
