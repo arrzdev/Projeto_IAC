@@ -33,7 +33,7 @@ PLAY_SOUND EQU 0605AH
 
 ;energy display
 SET_ENERGY EQU 0A000H ;address of energy display (POUT-1)
-MAX_ENERGY EQU 0100H
+MAX_ENERGY EQU 064H
 MIN_ENERGY EQU 0H
 
 ;keyboard
@@ -41,6 +41,9 @@ SET_KEY_LINE EQU 0C000H ;address of keyboard lines (POUT-2)
 READ_KEY_COL EQU 0E000H ;adress of keyboard colums (PIN)
 KEY_MAX_LIN EQU 8 ;max keyboard line
 MASK EQU 0FH	
+
+;pin
+PIN_INPUT EQU 0E000H
 
 ;keys
 KEY_LEFT EQU 00H
@@ -69,6 +72,20 @@ pilha:
 
 INITIAL_SP:
 
+;exceptions table
+tab:
+  WORD rot_meteor			; rotina de atendimento da interrupção 1
+  WORD rot_missil			; rotina de atendimento da interrupção 0
+  WORD rot_energy			; rotina de atendimento da interrupção 2
+
+CURRENT_PRESSED_KEY:
+  WORD -1 ;default value for current pressed key
+
+LAST_PRESSED_KEY:
+  WORD -1 ;default value for last pressed key
+
+CURRENT_ENERGY:
+  WORD 064H ;starting value (100% energy)
 
 ENTITY_MARIO:
   ;entity position
@@ -134,13 +151,16 @@ setup:
   MOV [CLEAR_SCREEN], R1 ;clear pixels on screen
   MOV R1, 0 ;background 0
   MOV [SET_BACKGROUND], R1 ;set background
+  MOV R2, 100H
+  MOV [SET_ENERGY], R2 ;set initial energy
+  MOV BTE, tab			; inicializa BTE (registo de Base da Tabela de Exceções)
+
+  EI0
+  EI1
+  EI2
+  EI
   
 start:
-  ;render initial entities:
-
-  ;render idling mario
-  CALL idle_mario
-
   ;render goomba
   MOV R8, 1 ;set action to "write"
   MOV R3, ENTITY_GOOMBA ;set entity to goomba
@@ -148,8 +168,25 @@ start:
 
   ;start keyboard listen
   keyboard_handler_loop:  
+    ;read the lines of the keyboard and return the read key at R0
     CALL handle_keyboard
-    JMP keyboard_handler_loop
+
+    ;if key pressed != -1 run actions
+    MOV R0, [CURRENT_PRESSED_KEY]
+    CMP R0, -1
+    JZ no_actions
+
+    ;process keys
+    CALL handle_actions
+    JMP loop
+
+    no_actions:
+      CALL idle_mario
+
+    loop:
+      ;save last pressed key for later checks
+      MOV [LAST_PRESSED_KEY], R0
+      JMP keyboard_handler_loop
 
 ; **********************************************************************
 ; RENDER_SPRITE :
@@ -256,12 +293,9 @@ render_pixel:
 ;  - loop until a key is pressed on keyboard and execute function accordingly
 ; **********************************************************************
 handle_keyboard:
-  PUSH R0 ;key that was listened / current background index
+  PUSH R0
   PUSH R1 ;max line / max background index
-  PUSH R2 ;constant to convert hext to decimal
   PUSH R6 ;line to test / sprite to render / constant to convert hext to decimal
-  PUSH R7 ;direction to move / constant to convert hext to decimal
-  PUSH R8 ;stores R10 to convert from hex to decimal
 
   MOV R1, 8 ;max line and max background are both 8
 
@@ -273,50 +307,63 @@ handle_keyboard:
     
     ;if a key is being pressed
     CMP R0, -1
-    JNZ handle_actions
+    JNZ return_handle_keyboard
+    
+    ;check if we already listened the whole keyboard
+    CMP R6, R1 ;R6 == 8
+    JZ return_handle_keyboard
 
     ;otherwise 
     ROL R6, 1 ;test next line by rotating to the left
-
-    ;render mario idle sprite when no key is being pressed
-    CALL idle_mario
-
-    ;check if we already listened the whole keyboard
-    CMP R6, R1
-    JNZ test_line; R6 != 8, just continue listening the keyboard lines ahead
-
-    ;otherwise 
-    ;reset last key pressed
-    MOV R4, -1
-
-    ;start listening from begining
     JMP test_line
+
+  return_handle_keyboard:
+    ;save the pressed key
+    MOV [CURRENT_PRESSED_KEY], R0
+
+    POP R6
+    POP R1
+    POP R0
+    RET
   
-  handle_actions:
-    CMP R0, KEY_LEFT
-    JZ move_mario_left
+handle_actions:
+  PUSH R0 ;key that was listened / current background index
+  PUSH R1 ;max line / max background index
+  PUSH R2
+  PUSH R3
+  PUSH R4
+  PUSH R6
+  PUSH R7
+  PUSH R8
+  PUSH R10
 
-    CMP R0, KEY_RIGHT
-    JZ move_mario_right
+  MOV R0, [CURRENT_PRESSED_KEY]
+  MOV R1, 8 ;max background index
 
-    CMP R0, KEY_DOWN
-    JZ move_goomba_down
+  CMP R0, KEY_LEFT
+  JZ move_mario_left
 
-    CMP R0, KEY_ENERGY_UP
-    JZ energy_increase
+  CMP R0, KEY_RIGHT
+  JZ move_mario_right
 
-    CMP R0, KEY_ENERGY_DOWN
-    JZ energy_decrease
+  CMP R0, KEY_DOWN
+  JZ move_goomba_down
 
-    ;the key doesn't have any action associated
-    JMP return_handle
+  CMP R0, KEY_ENERGY_UP
+  JZ energy_increase
 
-; **********************************************************************
-; MOVE_MARIO_LEFT :
-;  - function to move mario left
-;  - by pressing the key "0", mario moves left
-;  - it enables you to keep pressing the key to continue moving
-; **********************************************************************
+  CMP R0, KEY_ENERGY_DOWN
+  JZ energy_decrease
+
+  ;the key doesn't have any action associated
+  JMP return_handle_actions
+
+  ; **********************************************************************
+  ; MOVE_MARIO_LEFT :
+  ;  - function to move mario left
+  ;  - by pressing the key "0", mario moves left
+  ;  - it enables you to keep pressing the key to continue moving
+  ; **********************************************************************
   move_mario_left:
     ;get current background index
     MOV R0, [SET_BACKGROUND]
@@ -344,14 +391,14 @@ handle_keyboard:
 
     CALL check_left_boundary
     CALL movement
-    JMP return_handle
+    JMP return_handle_actions
 
-; **********************************************************************
-; MOVE_MARIO_RIGHT :
-;  - function to move mario right
-;  - by pressing the key "2", mario moves right
-;  - it enables you to keep pressing the key to continue moving
-; **********************************************************************
+  ; **********************************************************************
+  ; MOVE_MARIO_RIGHT :
+  ;  - function to move mario right
+  ;  - by pressing the key "2", mario moves right
+  ;  - it enables you to keep pressing the key to continue moving
+  ; **********************************************************************
   move_mario_right:
     ;get current background index
     MOV R0, [SET_BACKGROUND]
@@ -379,18 +426,18 @@ handle_keyboard:
 
     CALL check_right_boundary
     CALL movement
-    JMP return_handle
+    JMP return_handle_actions
 
-; **********************************************************************
-; MOVE_GOOMBA_DOWN :
-;  - function to move goomba down
-;  - by pressing "3", goomba moves down
-;  - it only moves one pixel at a time
-; **********************************************************************
+  ; **********************************************************************
+  ; MOVE_GOOMBA_DOWN :
+  ;  - function to move goomba down
+  ;  - by pressing "3", goomba moves down
+  ;  - it only moves one pixel at a time
+  ; **********************************************************************
   move_goomba_down:
-    ;if last action was goomba down, skip it
-    CMP R4, R0;
-    JZ return_handle
+    MOV R3, [LAST_PRESSED_KEY] ;get last pressed key
+    CMP R3, R0
+    JZ return_handle_actions
 
     ;set action entity as goomba
     MOV R3, ENTITY_GOOMBA
@@ -400,63 +447,39 @@ handle_keyboard:
 
     CALL check_bottom_boundary
     CALL movement
-    JMP return_handle
+    JMP return_handle_actions
 
-; **********************************************************************
-; ENERGY_INCREASE :
-;  - function to increase energy level
-;  - by pressing "4", energy increases by 1
-;  - it only increases 1 at a time
-; **********************************************************************
+  ; **********************************************************************
+  ; ENERGY_INCREASE :
+  ;  - function to increase energy level
+  ;  - by pressing "4", energy increases by 1
+  ;  - it only increases 1 at a time
+  ; **********************************************************************
   energy_increase:
     ;if last action was energy increase, skip it
+    MOV R4, [LAST_PRESSED_KEY] ;get last pressed key
     CMP R4, R0
-    JZ return_handle
+    JZ return_handle_actions
 
-    MOV R6, 9
-    MOV R7, 10H
-
-    MOV R8, R10
-
-    ;get max energy level
-    MOV R1, MAX_ENERGY
-
-    ;if energy is at max level, do nothing 
-    ;R10 stores the current energy
-    CMP R10, R1
-    JZ return_handle
-
-    ; Logic for units
-
-    MOD R8, R7 ;R8 is the first digit of the current energy (R10)
-
-    CMP R8, R6 ;if energy last digit is 9 add 6, convert hexadecimal to decimal
-    JNZ increase_one ;else only add 1
-
-    increase_six:
-      ADD R10, 6
+    MOV R10, [CURRENT_ENERGY] ;get current energy
+    
+    ;if current energy is 100 skip it
+    MOV R7, MAX_ENERGY
+    CMP R10, R7
+    JZ return_handle_actions
 
     ;otherwise
-    increase_one: 
-      ADD R10, 1
+    ADD R10, 5
+    CALL hexa_to_decimal
 
-    ; Logic for tens
-    MOV R7, 0A0H ;when R10 is 99H and you increase +1 (6 in this case)
+    ;save new energy
+    MOV [CURRENT_ENERGY], R10
 
-    CMP R10, R7 ;if energy tens digit is 9 add 60, convert hexadecimal to decimal
-    JNZ set_increase_energy ;else only add 1
+    ;set new energy on display
+    MOV R2, SET_ENERGY
+    MOV [R2], R8
 
-    increase_sixty:
-      MOV R7, 60H
-      ADD R10, R7
-
-
-    set_increase_energy:
-      ;save energy value
-      MOV R2, SET_ENERGY
-      MOV [R2], R10
-
-    JMP return_handle
+    JMP return_handle_actions
 
 ; **********************************************************************
 ; ENERGY_DECREASE :
@@ -466,54 +489,37 @@ handle_keyboard:
 ; **********************************************************************
   energy_decrease:
     ;if last action was energy decrease, skip it
+    MOV R4, [LAST_PRESSED_KEY] ;get last pressed key
     CMP R4, R0
-    JZ return_handle
+    JZ return_handle_actions
 
-    MOV R7, 10H
+    MOV R10, [CURRENT_ENERGY] ;get current energy
+    
+    ;if current energy is 0 skip it
+    MOV R7, MIN_ENERGY
+    CMP R10, R7
+    JZ return_handle_actions
 
-    MOV R8, R10
+    ;otherwise
+    SUB R10, 5
+    CALL hexa_to_decimal
 
-    ;get min energy level
-    MOV R1, MIN_ENERGY
+    ;save new energy
+    MOV [CURRENT_ENERGY], R10
 
-    ;if energy is at min level, do nothing 
-    ;R10 stores the current energy
-    CMP R10, R1
-    JZ return_handle
+    ;set new energy on display
+    MOV R2, SET_ENERGY
+    MOV [R2], R8
 
-    MOV R1, MAX_ENERGY
-    CMP R10, R1
-    JNZ not_decrease_edgecase
+    JMP return_handle_actions
 
-    MOV R10, 99H
-    JMP set_decrease_energy
-
-    not_decrease_edgecase:
-      MOD R8, R7 ;R8 is the first digit of the current energy (R10)
-
-      CMP R8, 0 ;if energy last digit is 0 sub 6, convert hexadecimal to decimal
-      JNZ decrease_one ;else only add 1
-
-      decrease_six:
-        MOV R8, R10
-        SUB R10, 6
-
-      ;otherwise
-      decrease_one:   
-        SUB R10, 1
-
-    set_decrease_energy:
-      ;save energy value
-      MOV R2, SET_ENERGY
-      MOV [R2], R10
-
-  return_handle:
-    ;save pressed key for later checks
-    MOV R4, R0
-
+  return_handle_actions:
+    POP R10
     POP R8
     POP R7
     POP R6
+    POP R4
+    POP R3
     POP R2
     POP R1
     POP R0
@@ -528,14 +534,14 @@ handle_keyboard:
 listen_keyboard_line:
   PUSH R2
   PUSH R3
-  PUSH R5
+  PUSH R4
   
   MOV R2, SET_KEY_LINE ;adress of keyboard lines
   MOV R3, READ_KEY_COL ;adress of keyboard columns
-  MOV R5, MASK ;isolate the 4 dominant bits 
+  MOV R4, MASK ;isolate the 4 dominant bits 
   MOVB [R2], R6 ;set the line to be read
   MOVB R0, [R3] ;read the column pressed
-  AND R0, R5 ;isolate the 4 dominant bits
+  AND R0, R4 ;isolate the 4 dominant bits
 
   ;if there isn't any key being pressed
   CMP R0, 0
@@ -549,7 +555,7 @@ listen_keyboard_line:
     MOV R0, -1 ;set listened key as -1
 
   return_key:
-    POP	R5
+    POP	R4
     POP	R3
     POP	R2
     RET
@@ -806,3 +812,89 @@ idle_mario:
     POP R4
     POP R3
     RET
+
+; **********************************************************************
+; hexa_decimal :
+;  - function to convert hexadecimal to decimal
+;  - R7 has the hexadecimal value
+;  - R8 has the result
+; **********************************************************************
+; numero R7
+; resultado R8
+; fator R1
+; div constant R2
+; digito R3
+hexa_to_decimal:
+  PUSH R1
+  PUSH R2
+  PUSH R3
+  PUSH R10
+  
+  MOV R1, 1000
+  MOV R2, 10
+
+  MOV R8, 0
+
+  hexa_to_decimal_loop_start:
+    MOD R10, R1 ; número = número MOD fator; número é o valor a converter
+    DIV R1, R2 ; fator = fator DIV 10; fator de divisão (começar em 1000 decimal)
+
+    CMP R1, 0 ; se fator for 0, termina o loop
+    JZ return_hexa_to_decimal
+
+    MOV R3, R10 ; dígito = número DIV fator; mais um dígito do valor decimal
+    DIV R3, R1
+
+    SHL R8, 4  ; resultado = resultado SHL 4; desloca, para dar espaço ao novo dígito
+    OR R8, R3  ; resultado = resultado OR dígito; vai compondo o resultado
+
+    JMP hexa_to_decimal_loop_start
+
+  return_hexa_to_decimal:
+    POP R10
+    POP R3
+    POP R2
+    POP R1
+    RET
+
+; **********************************************************************
+; GEN_NUMBER:
+;  - function to generate a random number
+;  - it generates a random number between 0 and 7
+; **********************************************************************
+  gen_number:
+    ;generate a random number between 0 and 7
+    MOV R1, [PIN_INPUT]
+    MOV R2, 8
+
+    MOD R1, R2
+
+    JMP return_handle
+
+  return_handle:
+    ;save pressed key for later checks
+    MOV R4, R0
+
+    POP R8
+    POP R7
+    POP R6
+    POP R2
+    POP R1
+    POP R0
+    RET
+
+; **********************************************************************
+; ROT_INT_0 - 
+; **********************************************************************
+rot_energy:
+  RFE					; Return From Exception (diferente do RET)
+; **********************************************************************
+; ROT_INT_1 - 
+; **********************************************************************
+rot_meteor:
+  RFE					; Return From Exception (diferente do RET)
+; **********************************************************************
+; ROT_INT_2 - 
+; **********************************************************************
+rot_missil:
+  RFE					; Return From Exception (diferente do RET)
