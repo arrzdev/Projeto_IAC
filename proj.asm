@@ -33,7 +33,7 @@ PLAY_SOUND EQU 0605AH
 
 ;energy display
 SET_ENERGY EQU 0A000H ;address of energy display (POUT-1)
-MAX_ENERGY EQU 0100H
+MAX_ENERGY EQU 064H
 MIN_ENERGY EQU 0H
 
 ;keyboard
@@ -82,7 +82,6 @@ tab:
 	WORD rot_int_0			; rotina de atendimento da interrupção 0
 	WORD rot_int_1			; rotina de atendimento da interrupção 1
 	WORD rot_int_2			; rotina de atendimento da interrupção 2
-	WORD rot_int_3			; rotina de atendimento da interrupção 3
 
 
 ENTITY_MARIO:
@@ -156,10 +155,12 @@ setup:
   EI0
   EI1
   EI2
-  EI3
   EI
   
 start:
+  MOV R2, SET_ENERGY
+  MOV R7, 100H
+  MOV [R2], R7
   ;render initial entities:
 
   ;render idling mario
@@ -440,48 +441,21 @@ handle_keyboard:
     CMP R4, R0
     JZ return_handle
 
-    MOV R6, 9
-    MOV R7, 10H
+    MOV R7, MAX_ENERGY
 
-    MOV R8, R10
-
-    ;get max energy level
-    MOV R1, MAX_ENERGY
-
-    ;if energy is at max level, do nothing 
-    ;R10 stores the current energy
-    CMP R10, R1
+    CMP R10, R7
     JZ return_handle
 
     ; Logic for units
-
-    MOD R8, R7 ;R8 is the first digit of the current energy (R10)
-
-    CMP R8, R6 ;if energy last digit is 9 add 6, convert hexadecimal to decimal
-    JNZ increase_one ;else only add 1
-
-    increase_six:
-      ADD R10, 6
-
     ;otherwise
     increase_one: 
-      ADD R10, 1
-
-    ; Logic for tens
-    MOV R7, 0A0H ;when R10 is 99H and you increase +1 (6 in this case)
-
-    CMP R10, R7 ;if energy tens digit is 9 add 60, convert hexadecimal to decimal
-    JNZ set_increase_energy ;else only add 1
-
-    increase_sixty:
-      MOV R7, 60H
-      ADD R10, R7
-
+      ADD R10, 5
 
     set_increase_energy:
-      ;save energy value
       MOV R2, SET_ENERGY
-      MOV [R2], R10
+      MOV R7, R10
+      CALL hexa_to_decimal
+      MOV [R2], R8
 
     JMP return_handle
 
@@ -496,43 +470,21 @@ handle_keyboard:
     CMP R4, R0
     JZ return_handle
 
-    MOV R7, 10H
+    MOV R7, MIN_ENERGY
 
-    MOV R8, R10
-
-    ;get min energy level
-    MOV R1, MIN_ENERGY
-
-    ;if energy is at min level, do nothing 
-    ;R10 stores the current energy
-    CMP R10, R1
+    CMP R10, R7
     JZ return_handle
 
-    MOV R1, MAX_ENERGY
-    CMP R10, R1
-    JNZ not_decrease_edgecase
-
-    MOV R10, 99H
-    JMP set_decrease_energy
-
-    not_decrease_edgecase:
-      MOD R8, R7 ;R8 is the first digit of the current energy (R10)
-
-      CMP R8, 0 ;if energy last digit is 0 sub 6, convert hexadecimal to decimal
-      JNZ decrease_one ;else only add 1
-
-      decrease_six:
-        MOV R8, R10
-        SUB R10, 6
-
-      ;otherwise
-      decrease_one:   
-        SUB R10, 1
+    ;otherwise
+    decrease_one:   
+      SUB R10, 5
 
     set_decrease_energy:
       ;save energy value
       MOV R2, SET_ENERGY
-      MOV [R2], R10
+      MOV R7, R10
+      CALL hexa_to_decimal
+      MOV [R2], R8
 
     JMP return_handle
 
@@ -850,6 +802,48 @@ idle_mario:
     POP R3
     RET
 
+; **********************************************************************
+; hexa_decimal :
+;  - function to convert hexadecimal to decimal
+;  - R7 has the hexadecimal value
+;  - R8 has the result
+; **********************************************************************
+; numero R7
+; resultado R8
+; fator R1
+; div constant R2
+; digito R3
+hexa_to_decimal:
+  PUSH R1
+  PUSH R2
+  PUSH R3
+  
+  MOV R1, 1000
+  MOV R2, 10
+
+  MOV R8, 0
+
+  hexa_to_decimal_loop_start:
+    MOD R7, R1 ; número = número MOD fator; número é o valor a converter
+    DIV R1, R2 ; fator = fator DIV 10; fator de divisão (começar em 1000 decimal)
+
+    CMP R1, 0 ; se fator for 0, termina o loop
+    JZ hexa_to_decimal_loop_end
+
+    MOV R3, R7 ; dígito = número DIV fator; mais um dígito do valor decimal
+    DIV R3, R1
+
+    SHL R8, 4  ; resultado = resultado SHL 4; desloca, para dar espaço ao novo dígito
+    OR R8, R3  ; resultado = resultado OR dígito; vai compondo o resultado
+
+    JMP hexa_to_decimal_loop_start
+
+  hexa_to_decimal_loop_end:
+    POP R3
+    POP R2
+    POP R1
+
+  RET
 
 
 ; **********************************************************************
@@ -866,9 +860,4 @@ rot_int_1:
 ; ROT_INT_2 - 
 ; **********************************************************************
 rot_int_2:
-  RFE					; Return From Exception (diferente do RET)
-; **********************************************************************
-; ROT_INT_3 - 
-; **********************************************************************
-rot_int_3:
   RFE					; Return From Exception (diferente do RET)
