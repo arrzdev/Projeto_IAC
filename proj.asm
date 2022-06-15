@@ -49,6 +49,11 @@ KEY_DOWN EQU 03H
 KEY_ENERGY_UP EQU 04H
 KEY_ENERGY_DOWN EQU 05H
 
+KEY_GEN_NUM EQU 06H
+
+;pin
+PIN_INPUT EQU 0E000H
+
 ;colors
 BLACK EQU 0F000H
 RED EQU 0FF00H
@@ -68,6 +73,16 @@ pilha:
   STACK 100H
 
 INITIAL_SP:
+
+num_gen_n:
+  WORD 0
+
+; Tabela das rotinas de interrupção
+tab:
+	WORD rot_int_0			; rotina de atendimento da interrupção 0
+	WORD rot_int_1			; rotina de atendimento da interrupção 1
+	WORD rot_int_2			; rotina de atendimento da interrupção 2
+	WORD rot_int_3			; rotina de atendimento da interrupção 3
 
 
 ENTITY_MARIO:
@@ -134,6 +149,15 @@ setup:
   MOV [CLEAR_SCREEN], R1 ;clear pixels on screen
   MOV R1, 0 ;background 0
   MOV [SET_BACKGROUND], R1 ;set background
+
+
+  MOV  BTE, tab			; inicializa BTE (registo de Base da Tabela de Exceções)
+
+  EI0
+  EI1
+  EI2
+  EI3
+  EI
   
 start:
   ;render initial entities:
@@ -307,6 +331,9 @@ handle_keyboard:
 
     CMP R0, KEY_ENERGY_DOWN
     JZ energy_decrease
+
+    CMP R0, KEY_GEN_NUM
+    JZ gen_number
 
     ;the key doesn't have any action associated
     JMP return_handle
@@ -506,6 +533,22 @@ handle_keyboard:
       ;save energy value
       MOV R2, SET_ENERGY
       MOV [R2], R10
+
+    JMP return_handle
+
+; **********************************************************************
+; GEN_NUMBER:
+;  - function to generate a random number
+;  - it generates a random number between 0 and 7
+; **********************************************************************
+  gen_number:
+    ;generate a random number between 0 and 7
+    MOV R1, [PIN_INPUT]
+    MOV R2, 8
+
+    MOD R1, R2
+
+    JMP return_handle
 
   return_handle:
     ;save pressed key for later checks
@@ -806,3 +849,26 @@ idle_mario:
     POP R4
     POP R3
     RET
+
+
+
+; **********************************************************************
+; ROT_INT_0 - 
+; **********************************************************************
+rot_int_0:
+  RFE					; Return From Exception (diferente do RET)
+; **********************************************************************
+; ROT_INT_1 - 
+; **********************************************************************
+rot_int_1:
+  RFE					; Return From Exception (diferente do RET)
+; **********************************************************************
+; ROT_INT_2 - 
+; **********************************************************************
+rot_int_2:
+  RFE					; Return From Exception (diferente do RET)
+; **********************************************************************
+; ROT_INT_3 - 
+; **********************************************************************
+rot_int_3:
+  RFE					; Return From Exception (diferente do RET)
