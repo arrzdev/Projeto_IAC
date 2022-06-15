@@ -87,33 +87,50 @@ LAST_PRESSED_KEY:
 CURRENT_ENERGY:
   WORD 064H ;starting value (100% energy)
 
-ENTITY_MARIO:
-  ;entity position
-  WORD 30 ;default x
-  WORD 25 ;default y
+ENTITIES:
+  ;meteor 1
+  WORD 0, 0, 0, TEMPLATE_ENEMIE ;(x, y, state, template)
 
-  ;entity sprite index
-  WORD 1 ;default sprite index
+  ;meteor 2
+  WORD 7, 0, 0, TEMPLATE_ENEMIE ;(x, y, state, template)
 
-  ;entity size
-  WORD 5 ;lenght value of caracter
-  WORD 5 ;height value of caracter
-  
+  ;meteor 3
+  WORD 14, 0, 0, TEMPLATE_FRIENDLY ;(x, y, state, template)
+
+  ;meteor 4
+  WORD 21, 0, 0, TEMPLATE_FRIENDLY ;(x, y, state, template)
+
+  ;mario
+  WORD 30, 25, 0, TEMPLATE_MARIO ;(x, y, state, template)
+
+;templates
+TEMPLATE_MARIO:
   ;sprite #0 (mario looking forward)
+  WORD 5 ;lenght
+  WORD 5 ;height
+  
   WORD 0, RED, RED, RED, 0		
   WORD 0, BLACK, NUDE, BLACK, 0
   WORD RED, BLUE, RED, BLUE, RED
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
 
+  
   ;sprite #1 (mario looking left)
+  WORD 5 ;lenght
+  WORD 5 ;height
+
   WORD RED, RED, RED, RED, 0		
   WORD 0, NUDE, NUDE, BLACK, 0
   WORD RED, BLUE, RED, BLUE, RED
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
 
+
   ;sprite #2 (mario looking right)
+  WORD 5 ;lenght
+  WORD 5 ;height
+
   WORD 0, RED, RED, RED, RED		
   WORD 0, BLACK, NUDE, NUDE, 0
   WORD RED, BLUE, RED, BLUE, RED
@@ -121,23 +138,87 @@ ENTITY_MARIO:
   WORD 0, BLACK, 0, BLACK, 0
 
 
-ENTITY_GOOMBA:
-  WORD 30 ;default x
-  WORD 0 ;default y
-
-  ;entity sprite index
-  WORD 0 ;default sprite index
-
-  ;entity size
-  WORD 5 ;lenght value of caracter
-  WORD 5 ;height value of caracter
-
+TEMPLATE_ENEMIE:
   ;sprite 0
-  WORD 0, 0, BROWN, 0, 0
-  WORD 0, BROWN, WHITE, BROWN, 0
-  WORD BROWN, WHITE, BROWN, BROWN, BROWN
-  WORD 0, BLACK, NUDE, BLACK, 0
-  WORD 0, NUDE, NUDE, NUDE, 0
+  WORD 1 ;lenght
+  WORD 1 ;height
+
+  WORD BROWN
+ 
+  ;sprite 1
+  WORD 2 ;lenght
+  WORD 2 ;height
+
+  WORD BROWN, BROWN
+  WORD BROWN, BROWN
+
+  ;sprite 3
+  WORD 3 ;lenght
+  WORD 3 ;height
+
+  WORD BROWN, BROWN, BROWN
+  WORD BROWN, BROWN, BROWN
+  WORD BROWN, BROWN, BROWN
+
+  ;sprite 4
+  WORD 4 ;lenght
+  WORD 4 ;height
+
+  WORD BROWN, BROWN, BROWN, BROWN
+  WORD BROWN, BROWN, BROWN, BROWN
+  WORD BROWN, BROWN, BROWN, BROWN
+  WORD BROWN, BROWN, BROWN, BROWN
+
+  ;sprite 5
+  WORD 5 ;lenght
+  WORD 5 ;height
+
+  WORD BROWN, BROWN, BROWN, BROWN, BROWN
+  WORD BROWN, BROWN, BROWN, BROWN, BROWN
+  WORD BROWN, BROWN, BROWN, BROWN, BROWN
+  WORD BROWN, BROWN, BROWN, BROWN, BROWN
+  WORD BROWN, BROWN, BROWN, BROWN, BROWN
+
+TEMPLATE_FRIENDLY:
+  ;sprite 0
+  WORD 1 ;lenght
+  WORD 1 ;height
+
+  WORD RED
+ 
+  ;sprite 1
+  WORD 2 ;lenght
+  WORD 2 ;height
+
+  WORD RED, RED
+  WORD RED, RED
+
+  ;sprite 3
+  WORD 3 ;lenght
+  WORD 3 ;height
+
+  WORD RED, RED, RED
+  WORD RED, RED, RED
+  WORD RED, RED, RED
+
+  ;sprite 4
+  WORD 4 ;lenght
+  WORD 4 ;height
+
+  WORD RED, RED, RED, RED
+  WORD RED, RED, RED, RED
+  WORD RED, RED, RED, RED
+  WORD RED, RED, RED, RED
+
+  ;sprite 5
+  WORD 5 ;lenght
+  WORD 5 ;height
+
+  WORD RED, RED, RED, RED, RED
+  WORD RED, RED, RED, RED, RED
+  WORD RED, RED, RED, RED, RED
+  WORD RED, RED, RED, RED, RED
+  WORD RED, RED, RED, RED, RED
 
 ;**********************************************************************************
 ;--------------------------------------CODE----------------------------------------
@@ -163,30 +244,30 @@ setup:
 start:
   ;render goomba
   MOV R8, 1 ;set action to "write"
-  MOV R3, ENTITY_GOOMBA ;set entity to goomba
+  MOV R3, [ENTITIES] ;set entity to goomba
   CALL render_sprite
 
   ;start keyboard listen
-  keyboard_handler_loop:  
+  ;keyboard_handler_loop:  
     ;read the lines of the keyboard and return the read key at R0
-    CALL handle_keyboard
+    ;CALL handle_keyboard
 
     ;if key pressed != -1 run actions
-    MOV R0, [CURRENT_PRESSED_KEY]
-    CMP R0, -1
-    JZ no_actions
+    ;MOV R0, [CURRENT_PRESSED_KEY]
+    ;CMP R0, -1
+    ;JZ no_actions
 
     ;process keys
-    CALL handle_actions
-    JMP loop
+    ;CALL handle_actions
+    ;JMP loop
 
-    no_actions:
-      CALL idle_mario
+    ;no_actions:
+      ;CALL idle_mario
 
-    loop:
+    ;loop:
       ;save last pressed key for later checks
-      MOV [LAST_PRESSED_KEY], R0
-      JMP keyboard_handler_loop
+      ;MOV [LAST_PRESSED_KEY], R0
+      ;JMP keyboard_handler_loop
 
 ; **********************************************************************
 ; RENDER_SPRITE :
@@ -200,39 +281,62 @@ render_sprite:
   PUSH R0 ;register to temp store values
   PUSH R1 ;x
   PUSH R2 ;y
-  PUSH R3 ;pixel n 
+  PUSH R3 ;pixel n
   PUSH R4 ;lenght
   PUSH R5 ;width
   PUSH R6 ;iterator
   PUSH R7 ;selected sprite
+  PUSH R8 ;template / sprite
+  PUSH R9
+  PUSH R10
 
+  ;(x,y, state, template)
   ;get entity position
-  MOV R1, [R3] ;x
+  
+  ;x
+  MOV R1, [R3]
+
+  ;y
   MOV R2, [R3+2] ;y
 
-  ;get selected sprite index
+  ;get entitie state
   MOV R7, [R3+4]
 
-  ;get entity length
-  MOV R4, [R3+6] ;get entity length
-  MOV R5, [R3+8] ;get entity height
+  ;get entitie template
+  MOV  R8, [R3+6]
 
-  ;get first pixel of the first sprite
-  MOV R0, 10
-  ADD R3, R0 ;move to starting point of sprite rendering
-  ;R3 is set to be the address before 
+  ;we need to skip state n bytes
+  ;get template size
+  MOV R4, [R8]  
 
-  ;calc how much bytes we need to skip to render next sprite
-  ;skip n lenght pixels * 2
-  MUL R7, R5 
-  MOV R0, 2;
-  MUL R7, R0
+  loop:
+    CMP R7, 0 ;if state is 0, we are in the correct sprite
+    JZ leave ;leave this loop
 
-  ;skip n height pixels
-  MUL R7, R5
+    ;continue skipping bytes
+    ;get height and width to calculate (bytes / 2)
+    MOV R9, [R8]
+    MOV R10, [R8+2]
 
-  ;get first pixel of the selected sprite
-  ADD R3, R7
+    ;calculate area to skip
+    MUL R9, R10 ;R9 store bytes/2 to skip
+    MOV R0, 2 ;temp
+    MUL R9, R0 ;get actually bytes that need to be skipped
+
+    ;skip bytes
+    ADD R8, R9 ;skip pixel bytes
+    ADD R8, 4 ;skip x and y bytes
+
+    JMP loop    
+
+  leave:
+    ;here supposely we are in the correct sprite
+
+  MOV R4, [R8] ;get sprite length
+  MOV R5, [R8+2] ;get sprite height
+
+  ;get first pixel
+  MOV R3, [R8+4]
 
   MOV R6, R4 ;starting iterator value
   
@@ -381,7 +485,7 @@ handle_actions:
 
     ;move:
     ;set action entity as mario
-    MOV R3, ENTITY_MARIO
+    ;MOV R3, ENTITY_MARIO
 
     ;set sprite to render (left)
     MOV R6, 1
@@ -416,7 +520,7 @@ handle_actions:
 
     ;move:
     ;set action entity as mario
-    MOV R3, ENTITY_MARIO
+    ;MOV R3, ENTITY_MARIO
 
     ;set sprite to render (right)
     MOV R6, 2
@@ -440,7 +544,7 @@ handle_actions:
     JZ return_handle_actions
 
     ;set action entity as goomba
-    MOV R3, ENTITY_GOOMBA
+    ;MOV R3, ENTITY_GOOMBA
 
     ;move
     MOV R7, 2 ;set direction as 2 (special value for falling entities)
@@ -784,7 +888,7 @@ idle_mario:
   PUSH R8
 
   ;set action entity as mario
-  MOV R3, ENTITY_MARIO
+  ;MOV R3, ENTITY_MARIO
 
   ;get selected sprite
   MOV R4, [R3+4] ;
