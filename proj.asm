@@ -48,13 +48,17 @@ PIN_INPUT EQU 0E000H
 ;keys
 KEY_LEFT EQU 00H
 KEY_RIGHT EQU 02H
-KEY_DOWN EQU 03H
+KEY_SHOOT EQU 01H
 KEY_ENERGY_UP EQU 04H
 KEY_ENERGY_DOWN EQU 05H
 
 ;colors
 BLACK EQU 0F000H
+GRAY EQU 0F888H
 RED EQU 0FF00H
+DARKRED EQU	0FE00H
+GREEN EQU	0F0F0H	
+DARKGREEN EQU	0F0A0H	
 BROWN EQU 0FA52H
 NUDE EQU 0FFB5H
 BLUE EQU 0F06FH
@@ -72,12 +76,6 @@ pilha:
 
 INITIAL_SP:
 
-;exceptions table
-tab:
-  WORD rot_meteor			; rotina de atendimento da interrupção 1
-  WORD rot_missil			; rotina de atendimento da interrupção 0
-  WORD rot_energy			; rotina de atendimento da interrupção 2
-
 CURRENT_PRESSED_KEY:
   WORD -1 ;default value for current pressed key
 
@@ -87,57 +85,149 @@ LAST_PRESSED_KEY:
 CURRENT_ENERGY:
   WORD 064H ;starting value (100% energy)
 
-ENTITY_MARIO:
-  ;entity position
-  WORD 30 ;default x
-  WORD 25 ;default y
+;FLAGS
+ENERGY_FLAG:
+  WORD 0 ;by default flag is 0 (no energy update)
 
-  ;entity sprite index
-  WORD 1 ;default sprite index
+AGENTS_FLAG:
+  WORD 0 ;by default flag is 0 (no agents update)
 
-  ;entity size
-  WORD 5 ;lenght value of caracter
-  WORD 5 ;height value of caracter
-  
-  ;sprite #0 (mario looking forward)
+PROJECTILE_FLAG:
+  WORD 0 ;by default flag is 0 (no projectile update)
+;EXCEPTIONS TABLE
+TAB:
+  WORD rot_agents
+  WORD rot_projectile
+  WORD rot_energy
+;ENTITIES:
+AGENTS:
+  ;number of agents
+  WORD 4
+
+  ;agent 1
+  WORD 0, 0, -1, ENEMY_SPRITES ;(x, y, stage, sprites)
+
+  ;agent 2
+  WORD 0, 0, -1, FRIEND_SPRITES ;(x, y, stage, sprites)
+
+  ;agent 3
+  WORD 0, 0, -1, ENEMY_SPRITES ;(x, y, stage, sprites)
+
+  ;agent 4
+  WORD 0, 0, -1, FRIEND_SPRITES ;(x, y, stage, sprites)
+
+PLAYER:
+  WORD 30, 25, -1, PLAYER_SPRITES ;(x, y, stage, current_sprite)
+
+PROJECTILE:
+  WORD 0, 0, -1, PROJECTILE_SPRITES ;(x, y, stage, sprites)
+
+;SPRITES
+PLAYER_SPRITES:
+  ;sprite #0 (player looking forward)
+  WORD 5 ;lenght
+  WORD 5 ;height
   WORD 0, RED, RED, RED, 0		
   WORD 0, BLACK, NUDE, BLACK, 0
   WORD RED, BLUE, RED, BLUE, RED
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
 
-  ;sprite #1 (mario looking left)
+  ;sprite #1 (player looking left)
+  WORD 5 ;lenght
+  WORD 5 ;height
   WORD RED, RED, RED, RED, 0		
   WORD 0, NUDE, NUDE, BLACK, 0
   WORD RED, BLUE, RED, BLUE, RED
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
 
-  ;sprite #2 (mario looking right)
+  ;sprite #2 (player looking right)
+  WORD 5 ;lenght
+  WORD 5 ;height
   WORD 0, RED, RED, RED, RED		
   WORD 0, BLACK, NUDE, NUDE, 0
   WORD RED, BLUE, RED, BLUE, RED
   WORD WHITE, BLUE, BLUE, BLUE, WHITE
   WORD 0, BLACK, 0, BLACK, 0
 
+ENEMY_SPRITES:
+  ;sprite #0 
+  WORD 1 ;lenght
+  WORD 1 ;height
+  WORD GRAY		
 
-ENTITY_GOOMBA:
-  WORD 30 ;default x
-  WORD 0 ;default y
+  ;sprite #1
+  WORD 2 ;lenght
+  WORD 2 ;height
+  WORD GRAY, GRAY
+  WORD GRAY, GRAY
 
-  ;entity sprite index
-  WORD 0 ;default sprite index
+  ;sprite #2 
+  WORD 3 ;lenght
+  WORD 3 ;height
+  WORD 0, NUDE, 0
+  WORD NUDE, RED, NUDE
+  WORD 0, NUDE, 0
 
-  ;entity size
-  WORD 5 ;lenght value of caracter
-  WORD 5 ;height value of caracter
+  ;sprite #3 
+  WORD 4 ;lenght
+  WORD 4 ;height
+  WORD 0, NUDE, NUDE, 0
+  WORD NUDE, RED, RED, NUDE
+  WORD NUDE, RED, RED, NUDE
+  WORD 0, NUDE, NUDE, 0
 
-  ;sprite 0
-  WORD 0, 0, BROWN, 0, 0
-  WORD 0, BROWN, WHITE, BROWN, 0
-  WORD BROWN, WHITE, BROWN, BROWN, BROWN
-  WORD 0, BLACK, NUDE, BLACK, 0
+  ;sprite #4 
+  WORD 5 ;lenght
+  WORD 5 ;height
   WORD 0, NUDE, NUDE, NUDE, 0
+  WORD NUDE, DARKRED, RED, DARKRED, NUDE
+  WORD NUDE, RED, DARKRED, RED, NUDE
+  WORD NUDE, DARKRED, RED, DARKRED, NUDE
+  WORD 0, NUDE, NUDE, NUDE, 0
+
+
+FRIEND_SPRITES:
+  ;sprite #0 
+  WORD 1 ;lenght
+  WORD 1 ;height
+  WORD GRAY		
+
+  ;sprite #1
+  WORD 2 ;lenght
+  WORD 2 ;height
+  WORD GRAY, GRAY
+  WORD GRAY, GRAY
+
+  ;sprite #2 
+  WORD 3 ;lenght
+  WORD 3 ;height
+  WORD 0, NUDE, 0
+  WORD NUDE, GREEN, NUDE
+  WORD 0, NUDE, 0
+
+  ;sprite #3 
+  WORD 4 ;lenght
+  WORD 4 ;height
+  WORD 0, NUDE, NUDE, 0
+  WORD NUDE, GREEN, GREEN, NUDE
+  WORD NUDE, GREEN, GREEN, NUDE
+  WORD 0, NUDE, NUDE, 0
+
+  ;sprite #4 
+  WORD 5 ;lenght
+  WORD 5 ;height
+  WORD 0, NUDE, NUDE, NUDE, 0
+  WORD NUDE, DARKGREEN, GREEN, DARKGREEN, NUDE
+  WORD NUDE, GREEN, DARKGREEN, GREEN, NUDE
+  WORD NUDE, DARKGREEN, GREEN, DARKGREEN, NUDE
+  WORD 0, NUDE, NUDE, NUDE, 0
+
+PROJECTILE_SPRITES:
+  WORD 1 ;lenght
+  WORD 1 ;width
+  WORD GREEN
 
 ;**********************************************************************************
 ;--------------------------------------CODE----------------------------------------
@@ -153,86 +243,41 @@ setup:
   MOV [SET_BACKGROUND], R1 ;set background
   MOV R2, 100H
   MOV [SET_ENERGY], R2 ;set initial energy
-  MOV BTE, tab			; inicializa BTE (registo de Base da Tabela de Exceções)
+  MOV BTE, TAB			; inicializa BTE (registo de Base da Tabela de Exceções)
 
+  ;init exceptions
   EI0
   EI1
   EI2
   EI
   
 start:
-  ;render goomba
-  MOV R8, 1 ;set action to "write"
-  MOV R3, ENTITY_GOOMBA ;set entity to goomba
-  CALL render_sprite
-
   ;start keyboard listen
-  keyboard_handler_loop:  
+  game_handler_loop:  
     ;read the lines of the keyboard and return the read key at R0
     CALL handle_keyboard
 
-    ;if key pressed != -1 run actions
-    MOV R0, [CURRENT_PRESSED_KEY]
-    CMP R0, -1
-    JZ no_actions
+    ;handle updates
+    CALL energy_update
+    CALL agents_update
+    CALL projectile_update
 
-    ;process keys
+    ;handle keyboard actions
     CALL handle_actions
-    JMP loop
 
-    no_actions:
-      CALL idle_mario
-
-    loop:
-      ;save last pressed key for later checks
-      MOV [LAST_PRESSED_KEY], R0
-      JMP keyboard_handler_loop
+    JMP game_handler_loop
 
 ; **********************************************************************
 ; RENDER_SPRITE :
 ;   - function to render the sprites
 ;   - loops through all the lines and set each pixel at a time with the 
 ; colors from the sprite
-;   - the x and y positions to start rendering from are grabbed from the entitie
+;   - the x and y positions to start rendering from are grabbed from the entity
 ;   - the sprite is set by the sprite index also stored on the entity table
 ; **********************************************************************
 render_sprite:
   PUSH R0 ;register to temp store values
-  PUSH R1 ;x
-  PUSH R2 ;y
-  PUSH R3 ;pixel n 
-  PUSH R4 ;lenght
-  PUSH R5 ;width
   PUSH R6 ;iterator
-  PUSH R7 ;selected sprite
-
-  ;get entity position
-  MOV R1, [R3] ;x
-  MOV R2, [R3+2] ;y
-
-  ;get selected sprite index
-  MOV R7, [R3+4]
-
-  ;get entity length
-  MOV R4, [R3+6] ;get entity length
-  MOV R5, [R3+8] ;get entity height
-
-  ;get first pixel of the first sprite
-  MOV R0, 10
-  ADD R3, R0 ;move to starting point of sprite rendering
-  ;R3 is set to be the address before 
-
-  ;calc how much bytes we need to skip to render next sprite
-  ;skip n lenght pixels * 2
-  MUL R7, R5 
-  MOV R0, 2;
-  MUL R7, R0
-
-  ;skip n height pixels
-  MUL R7, R5
-
-  ;get first pixel of the selected sprite
-  ADD R3, R7
 
   MOV R6, R4 ;starting iterator value
   
@@ -251,13 +296,7 @@ render_sprite:
     SUB R5, 1 ;decrement height of sprite
     JNZ render_line
 
-  POP R7
   POP R6
-  POP R5
-  POP R4
-  POP R3
-  POP R2
-  POP R1
   POP R0
   RET
 
@@ -337,23 +376,21 @@ handle_actions:
   PUSH R8
   PUSH R10
 
+  ;if key pressed == -1 skip key checks
   MOV R0, [CURRENT_PRESSED_KEY]
+  CMP R0, -1
+  JZ no_key_pressed
+
   MOV R1, 8 ;max background index
 
   CMP R0, KEY_LEFT
-  JZ move_mario_left
+  JZ move_player_left
 
   CMP R0, KEY_RIGHT
-  JZ move_mario_right
+  JZ move_player_right
 
-  CMP R0, KEY_DOWN
-  JZ move_goomba_down
-
-  CMP R0, KEY_ENERGY_UP
-  JZ energy_increase
-
-  CMP R0, KEY_ENERGY_DOWN
-  JZ energy_decrease
+  CMP R0, KEY_SHOOT
+  JZ shoot_projectile
 
   ;the key doesn't have any action associated
   JMP return_handle_actions
@@ -364,7 +401,7 @@ handle_actions:
   ;  - by pressing the key "0", mario moves left
   ;  - it enables you to keep pressing the key to continue moving
   ; **********************************************************************
-  move_mario_left:
+  move_player_left:
     ;get current background index
     MOV R0, [SET_BACKGROUND]
     CMP R0, 0 ;0 is the lowest background index
@@ -380,10 +417,10 @@ handle_actions:
       MOV [SET_BACKGROUND], R0 ;set new background
 
     ;move:
-    ;set action entity as mario
-    MOV R3, ENTITY_MARIO
+    ;set entity as player
+    MOV R3, PLAYER
 
-    ;set sprite to render (left)
+    ;change entity state to 1 (left)
     MOV R6, 1
     MOV [R3+4], R6
 
@@ -399,7 +436,7 @@ handle_actions:
   ;  - by pressing the key "2", mario moves right
   ;  - it enables you to keep pressing the key to continue moving
   ; **********************************************************************
-  move_mario_right:
+  move_player_right:
     ;get current background index
     MOV R0, [SET_BACKGROUND]
     CMP R1, R0
@@ -416,9 +453,9 @@ handle_actions:
 
     ;move:
     ;set action entity as mario
-    MOV R3, ENTITY_MARIO
+    MOV R3, PLAYER
 
-    ;set sprite to render (right)
+    ;change entity state to 2 (right)
     MOV R6, 2
     MOV [R3+4], R6
 
@@ -428,90 +465,43 @@ handle_actions:
     CALL movement
     JMP return_handle_actions
 
-  ; **********************************************************************
-  ; MOVE_GOOMBA_DOWN :
-  ;  - function to move goomba down
-  ;  - by pressing "3", goomba moves down
-  ;  - it only moves one pixel at a time
-  ; **********************************************************************
-  move_goomba_down:
-    MOV R3, [LAST_PRESSED_KEY] ;get last pressed key
-    CMP R3, R0
-    JZ return_handle_actions
+  shoot_projectile:
+    ;check if a projectile already exist
+    MOV R0, [PROJECTILE+4] ;get projectile stage
+    CMP R0, 0 ;check if projectile exists
+    JZ return_handle_actions ;if projectile already exists don't do anything
 
-    ;set action entity as goomba
-    MOV R3, ENTITY_GOOMBA
+    ;create projectile
+    ;get player current position
+    MOV R4, [PLAYER] ;x
+    MOV R5, [PLAYER+2] ;y
 
-    ;move
-    MOV R7, 2 ;set direction as 2 (special value for falling entities)
+    ;set projectile position
+    ADD R4, 2 ;add 2 to shoot in the midle of the player
+    SUB R5, 1 ;add 1 to shoot above the player
+    MOV [PROJECTILE], R4 ;set x on the middle of mario
+    MOV [PROJECTILE+2], R5
 
-    CALL check_bottom_boundary
-    CALL movement
-    JMP return_handle_actions
+    ;set projectile stage to 0
+    MOV R0, 0
+    MOV [PROJECTILE+4], R0
 
-  ; **********************************************************************
-  ; ENERGY_INCREASE :
-  ;  - function to increase energy level
-  ;  - by pressing "4", energy increases by 1
-  ;  - it only increases 1 at a time
-  ; **********************************************************************
-  energy_increase:
-    ;if last action was energy increase, skip it
-    MOV R4, [LAST_PRESSED_KEY] ;get last pressed key
-    CMP R4, R0
-    JZ return_handle_actions
+    ;render
+    MOV R3, PROJECTILE ;set render entity 
+    MOV R8, 1 ;set action as write
+    CALL render_entity
 
-    MOV R10, [CURRENT_ENERGY] ;get current energy
-    
-    ;if current energy is 100 skip it
-    MOV R7, MAX_ENERGY
-    CMP R10, R7
-    JZ return_handle_actions
-
-    ;otherwise
-    ADD R10, 5
-    CALL hexa_to_decimal
-
-    ;save new energy
-    MOV [CURRENT_ENERGY], R10
-
-    ;set new energy on display
-    MOV R2, SET_ENERGY
-    MOV [R2], R8
+    ;remove 5 energy
+    CALL energy_decrease
 
     JMP return_handle_actions
 
-; **********************************************************************
-; ENERGY_DECREASE :
-;   - function to decrease energy level
-;   - by pressing "5", energy decreases by 1
-;   - it only decreases 1 at a time
-; **********************************************************************
-  energy_decrease:
-    ;if last action was energy decrease, skip it
-    MOV R4, [LAST_PRESSED_KEY] ;get last pressed key
-    CMP R4, R0
-    JZ return_handle_actions
+  no_key_pressed:
+    ;save this key as last pressed key
+    MOV [LAST_PRESSED_KEY], R0
 
-    MOV R10, [CURRENT_ENERGY] ;get current energy
-    
-    ;if current energy is 0 skip it
-    MOV R7, MIN_ENERGY
-    CMP R10, R7
-    JZ return_handle_actions
-
-    ;otherwise
-    SUB R10, 5
-    CALL hexa_to_decimal
-
-    ;save new energy
-    MOV [CURRENT_ENERGY], R10
-
-    ;set new energy on display
-    MOV R2, SET_ENERGY
-    MOV [R2], R8
-
-    JMP return_handle_actions
+    ;render player idle
+    CALL player_idle
 
   return_handle_actions:
     POP R10
@@ -578,7 +568,7 @@ movement:
 
   ;otherwise start by deleting the old sprite
   MOV R8, 0 ;set action to "delete"
-  CALL render_sprite ; delete sprite with action setted previously
+  CALL render_entity ; delete sprite with action setted previously
 
   ;check if we have the special value for falling entities (2)
   CMP R7, 2
@@ -611,7 +601,7 @@ movement:
   ;render new-position
   render_new_position:
     MOV R8, 1 ;set action to "write"
-    CALL render_sprite
+    CALL render_entity
 
   return_movement:
     POP R8
@@ -635,7 +625,7 @@ check_right_boundary:
   MOV R1, [R3]
 
   MOV R5, MAX_SCREEN_WIDTH ;get screen max width
-  MOV R6, [R3+6] ;get lenght of the entity
+  MOV R6, 5 ;get lenght of the entity
 
   ADD R1, R6 ;get sprite right edge
 
@@ -774,44 +764,79 @@ normalize_index:
   RET
 
 ; **********************************************************************
-; IDLE_MARIO :
-;  - function to render mario idle sprite
+; ENERGY_INCREASE :
+;  - function to increase energy level
+;  - by pressing "4", energy increases by 1
+;  - it only increases 1 at a time
 ; **********************************************************************
-idle_mario:
-  PUSH R3
-  PUSH R4
-  PUSH R6
+energy_increase:
+  PUSH R2
+  PUSH R7
   PUSH R8
+  PUSH R10
 
-  ;set action entity as mario
-  MOV R3, ENTITY_MARIO
-
-  ;get selected sprite
-  MOV R4, [R3+4] ;
-
-  ;if mario is already idling return function
-  CMP R4, 0 
-  JZ return_idle_mario
+  MOV R10, [CURRENT_ENERGY] ;get current energy
+  
+  ;if current energy is 100 skip it
+  MOV R7, MAX_ENERGY
+  CMP R10, R7
+  JZ return_energy_encrease
 
   ;otherwise
-  ;delete old sprite
-  MOV R8, 0 ;set action to "delete"
-  CALL render_sprite
+  ADD R10, 5
+  CALL hexa_to_decimal
 
-  ;set sprite to render (idle, looking forward)
-  MOV R6, 0
-  MOV [R3+4], R6
+  ;save new energy
+  MOV [CURRENT_ENERGY], R10
 
-  ;render new sprite
-  MOV R8, 1 ;set action to "write"
-  CALL render_sprite
+  ;set new energy on display
+  MOV R2, SET_ENERGY
+  MOV [R2], R8
 
-  return_idle_mario:
+  return_energy_encrease:
+    POP R10
     POP R8
-    POP R6
-    POP R4
-    POP R3
+    POP R7
+    POP R2
     RET
+
+; **********************************************************************
+; ENERGY_DECREASE :
+;   - function to decrease energy level
+;   - by pressing "5", energy decreases by 1
+;   - it only decreases 1 at a time
+; **********************************************************************
+energy_decrease:
+  PUSH R2
+  PUSH R7
+  PUSH R8
+  PUSH R10
+
+  MOV R10, [CURRENT_ENERGY] ;get current energy
+  
+  ;if current energy is 0 skip it
+  MOV R7, MIN_ENERGY
+  CMP R10, R7
+  JZ return_energy_decrease
+
+  ;otherwise
+  SUB R10, 5
+  CALL hexa_to_decimal
+
+  ;save new energy
+  MOV [CURRENT_ENERGY], R10
+
+  ;set new energy on display
+  MOV R2, SET_ENERGY
+  MOV [R2], R8
+
+  return_energy_decrease:
+    POP R10
+    POP R8
+    POP R7
+    POP R2
+    RET
+
 
 ; **********************************************************************
 ; hexa_decimal :
@@ -862,39 +887,338 @@ hexa_to_decimal:
 ;  - function to generate a random number
 ;  - it generates a random number between 0 and 7
 ; **********************************************************************
-  gen_number:
-    ;generate a random number between 0 and 7
-    MOV R1, [PIN_INPUT]
-    MOV R2, 8
+gen_number:
+  ;receives a range on R10 (0-R10)
+  ;generate a random number between 0 and 7
+  MOV R1, [PIN_INPUT]
+  MOD R1, R10
+  RET
 
-    MOD R1, R2
+player_idle:
+  PUSH R3
+  PUSH R6
+  PUSH R8
 
-    JMP return_handle
+  ;set entity as player
+  MOV R3, PLAYER
 
-  return_handle:
-    ;save pressed key for later checks
-    MOV R4, R0
+  ;change entity state to 0 (idle)
+  MOV R6, 0
+  MOV [R3+4], R6
 
-    POP R8
-    POP R7
-    POP R6
+  ;set action as write
+  MOV R8, 1  
+
+  CALL render_entity
+
+  POP R8
+  POP R6
+  POP R3
+  RET
+
+render_entity:
+  PUSH R1
+  PUSH R2
+  PUSH R3
+  PUSH R5
+  PUSH R6
+  PUSH R7
+  PUSH R9
+
+  ;get entity position
+  MOV R1, [R3] ;x
+  MOV R2, [R3+2] ;y
+
+  ;get entity state (sprite index)
+  MOV R6, [R3+4]
+
+  ;get entity sprites
+  MOV R3, [R3+6]
+
+  ;get sprite to render
+  get_sprite:
+    ;get sprite size
+    MOV R4, [R3] ;length
+    MOV R5, [R3+2] ;height
+
+    ADD R3, 4 ;skip size (lenght and height)
+
+    ;check if we are already are in the correct sprite
+    CMP R6, 0
+    JZ render
+
+    ;calc bytes to skip
+    MOV R7, R4 ;save R4 value
+    MUL R7, R5 ;calculate area of the sprite (bytes/2)
+    MOV R9, 2 ;constant 2
+    MUL R7, R9 ;R7 now have the number of bytes we need to skip
+
+    ;skip pixel bytes
+    ADD R3, R7 ;skip pixels
+    
+    ;subtract 1
+    SUB R6, 1
+    JMP get_sprite
+
+  render:
+    ;render
+    CALL render_sprite
+
+  POP R9
+  POP R7
+  POP R6
+  POP R5
+  POP R3
+  POP R2
+  POP R1
+  RET
+
+rot_energy:
+  PUSH R0
+
+  MOV R0, 1
+  MOV [ENERGY_FLAG], R0 ;set flag as 1
+
+  POP R0
+  RFE
+
+rot_agents:
+  PUSH R0
+
+  MOV R0, 1
+  MOV [AGENTS_FLAG], R0 ;set flag as 1
+
+  POP R0
+  RFE
+
+rot_projectile:
+  PUSH R0
+
+  MOV R0, 1
+  MOV [PROJECTILE_FLAG], R0 ;set flag as 1
+
+  POP R0
+  RFE
+
+energy_update:
+  PUSH R0
+
+  MOV R0, [ENERGY_FLAG] ;get energy flag
+
+  ;if flag is off skip update
+  CMP R0, 0
+  JZ return_energy_update
+
+  ;otherwise handle the update
+  CALL energy_decrease
+  MOV R0, 0
+  MOV [ENERGY_FLAG], R0 ;set energy flag to 0
+
+  return_energy_update:
+    POP R0
+    RET
+
+agents_update:
+  PUSH R0
+  PUSH R1
+  PUSH R2
+  PUSH R3
+  PUSH R4
+  PUSH R10
+
+  ;if flag is off skip update
+  MOV R0, [AGENTS_FLAG] ;get agents flag
+  CMP R0, 0
+  JZ return_agents_update
+
+  ;get number of agents
+  MOV R0, [AGENTS]
+
+  ;get agents
+  MOV R3, AGENTS
+  ADD R3, 2
+
+  update_loop:
+    ;check if we ended the loop
+    CMP R0, 0
+    JZ end_update_loop
+
+    ;update agent   
+    ;check if agent is dead
+    MOV R2, [R3+4] ;get agent stage
+    CMP R2, -1
+    JNZ update_agent
+
+    ;otherwise generate stats for the new agent
+
+    ;set y position as -1 becuase it's going to be incremented ahead
+    MOV R10, -1
+    MOV [R3+2], R10
+
+    ;set stage as 0
+    MOV R10, 0
+    MOV [R3+4], R10
+
+    ;generate random column
+    MOV R10, 58 ;range of the random number to be generated (column)
+    CALL gen_number ;returns random number on R1
+
+    ;set agent column
+    MOV [R3], R1 ;set the column as the randomly generated number
+
+    ;generate probability of being hostile or friendly
+    MOV R10, 100 ;range of the random number to be generated
+    CALL gen_number ;returns random number on R1
+  
+    ;check if random number is less than 25 (25% chance)
+    MOV R2, 25
+    CMP R1, R2
+    JLT gen_friendly
+
+    ;otherwise generate hostile
+    MOV R2, ENEMY_SPRITES
+    MOV [R3+6], R2
+    JMP update_agent
+
+    gen_friendly:
+    MOV R2, FRIEND_SPRITES
+    MOV [R3+6], R2
+
+    update_agent:
+      ;delete old agent
+      MOV R8, 0
+      CALL render_entity
+      
+      ;update y of the agent
+      ;add 1 to the y axis
+      MOV R1, [R3+2]
+      ADD R1, 1
+
+      ;save new y position value
+      MOV [R3+2], R1
+
+      ;update stage
+      MOV R2, 3
+      DIV R1, R2 ;divide y position by 3
+
+      ;check if calculated stage is greater than 3
+      MOV R2, R1 ;backup of the stage
+      SUB R2, 3
+      JLE update_stage
+
+      ;otherwise rewrite stage
+      MOV R1, 4
+
+    update_stage:
+      ;save new stage value
+      MOV [R3+4], R1
+
+    ;render new updated agent
+    MOV R8, 1 ;set action as write
+    CALL render_entity
+
+    ;check if touching bottom
+    MOV R1, [R3+2] ;get updated y position
+    MOV R2, [R3+4] ;get updated stage
+
+    ;get agent bottom edge position
+    ADD R1, R2 
+    ADD R1, 1 ;stage+1 is the sprite height
+
+    ;get max possible y position
+    MOV R2, MAX_SCREEN_HEIGHT
+    SUB R2, 1
+
+    CMP R1, R2
+    JNZ thank_you_next
+
+    ;delete agent
+    MOV R8, 0
+    CALL render_entity
+
+    ;otherwise set state as "deleted"
+    MOV R2, -1
+    MOV [R3+4], R2
+
+    thank_you_next:
+      ;go to next agent
+      MOV R1, 8
+      ADD R3, R1
+
+      SUB R0, 1 ;decrease loop iterator
+      JMP update_loop
+
+  end_update_loop:
+    ;reset flag
+    MOV R1, 0
+    MOV [AGENTS_FLAG], R0 ;set energy flag to 0
+
+  return_agents_update:
+    POP R10
+    POP R4
+    POP R3
     POP R2
     POP R1
     POP R0
     RET
 
-; **********************************************************************
-; ROT_INT_0 - 
-; **********************************************************************
-rot_energy:
-  RFE					; Return From Exception (diferente do RET)
-; **********************************************************************
-; ROT_INT_1 - 
-; **********************************************************************
-rot_meteor:
-  RFE					; Return From Exception (diferente do RET)
-; **********************************************************************
-; ROT_INT_2 - 
-; **********************************************************************
-rot_missil:
-  RFE					; Return From Exception (diferente do RET)
+projectile_update:
+  PUSH R0
+  PUSH R3
+  PUSH R4
+  PUSH R5
+
+  ;if flag is off skip update
+  MOV R0, [PROJECTILE_FLAG] ;get projectile flag
+  CMP R0, 0
+  JZ return_projectile_update
+
+  MOV R3, PROJECTILE
+
+  ;if projectile stage is -1 projectile doesnt exist
+  MOV R0, [R3+4] ;get projectile stage
+  CMP R0, -1
+  JZ return_projectile_update
+  
+  ;delete old projectile sprite
+  MOV R8, 0 ;set action as delete
+  CALL render_entity
+
+  ;get current projectile y
+  MOV R5, [R3+2]
+
+  ;change y position to make projectile go up
+  SUB R5, 1
+
+  ;update value
+  MOV [R3+2], R5
+
+  ;check if value is 14
+  MOV R0, 14 ;14 instead of 12 because our player is 2 pixels higher 
+
+  ;if we are not on the max height yet render
+  CMP R0, R5
+  JNZ render_projectile
+
+  ;otherwise delete projectile
+  MOV R0, -1
+  MOV [R3+4], R0 ;set stage as -1
+  JMP reset_projectile_flag
+
+  ;render new projectile position
+  render_projectile:
+    MOV R8, 1
+    CALL render_entity
+
+  reset_projectile_flag:
+    ;reset flag
+    MOV R0, 0
+    MOV [PROJECTILE_FLAG], R0
+  
+
+  return_projectile_update:
+    POP R5
+    POP R4
+    POP R3
+    POP R0
+    RET
