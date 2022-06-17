@@ -1164,9 +1164,14 @@ agents_update:
 
 projectile_update:
   PUSH R0
+  PUSH R1
+  PUSH R2
   PUSH R3
   PUSH R4
   PUSH R5
+  PUSH R6
+  PUSH R7
+  PUSH R8
 
   ;if flag is off skip update
   MOV R0, [PROJECTILE_FLAG] ;get projectile flag
@@ -1184,31 +1189,99 @@ projectile_update:
   MOV R8, 0 ;set action as delete
   CALL render_entity
 
-  ;get current projectile y
-  MOV R5, [R3+2]
+  MOV R4, [R3] ;get projectile x
+  MOV R5, [R3+2] ;get current projectile y
+  SUB R5, 1 ;change y position to make projectile go up
 
-  ;change y position to make projectile go up
-  SUB R5, 1
+  ;check for colision
+  MOV R0, [AGENTS];get number of agents 
 
-  ;update value
-  MOV [R3+2], R5
+  ;get agents
+  MOV R7, AGENTS
+  ADD R7, 2
 
-  ;check if value is 14
-  MOV R0, 14 ;14 instead of 12 because our player is 2 pixels higher 
+  check_colisions_loop:
+    CMP R0, 0 ;check if we ended the loop
+    JZ no_colisions
 
-  ;if we are not on the max height yet render
-  CMP R0, R5
-  JNZ render_projectile
+    MOV R1, R7 ;get current agent
 
-  ;otherwise delete projectile
-  MOV R0, -1
-  MOV [R3+4], R0 ;set stage as -1
-  JMP reset_projectile_flag
+    ;get current agent bottom edge
+    MOV R2, [R1+2] ;get current agent y position
 
-  ;render new projectile position
-  render_projectile:
+    ;add the current sprite height (=stage+1)
+    MOV R6, [R1+4]
+    ADD R2, R6
+    ADD R2, 1
+
+    ;check if current agent is at the same line as projectile
+    CMP R2, R5
+    JLT go_next_colision_check
+
+    ;check if projectile is on the right of the left edge of the agent
+    MOV R2, [R1] ;get current agent x position
+    CMP R4, R2
+    JLT go_next_colision_check
+
+    ;check if projectile is on the left of the right edge of the agent
+    ;making it between the 2 edges
+    ;add the current sprite width (=stage+1)
+    MOV R6, [R1+4] ;get current agent stage
+    ADD R6, 1
+    ADD R2, R6 ;R2 now have the right edge position
+    
+    CMP R2, R4
+    JLT go_next_colision_check
+    
+    ;otherwise delete agent
+    MOV R8, 0 ;set action as delete
+    MOV R3, R1 ;set entity to delete as the current agent
+    CALL render_entity
+
+    ;set stage to -1 to be regenerated at next agents update
+    MOV R6, -1
+    MOV [R1+4], R6
+
+    ;check if it's a bad agent in that case increase energy by 5
+    MOV R8, ENEMY_SPRITES
+    MOV R6, [R1+6]
+    CMP R6, R8
+    JNZ delete_projectile
+
+    ;otherwise increase
+    CALL energy_increase
+    JMP delete_projectile
+
+    go_next_colision_check:
+      ;set pointer to the next agent
+      MOV R6, 8
+      ADD R7, R6
+
+      ;subtract 1 from the iterator
+      SUB R0, 1
+      JMP check_colisions_loop
+
+  no_colisions:
+    ;check if value is 14
+    MOV R0, 14 ;14 instead of 12 because our player is 2 pixels higher 
+
+    ;if we are not on the max height yet render
+    CMP R0, R5
+    JZ delete_projectile
+
+    ;otherwise
+    ;render updated projectile
+    ;update y position value
+    MOV [R3+2], R5
     MOV R8, 1
     CALL render_entity
+    JMP reset_projectile_flag
+
+  ;render new projectile position
+  delete_projectile:
+    MOV R3, PROJECTILE
+    MOV R0, -1
+    MOV [R3+4], R0 ;set stage as -1
 
   reset_projectile_flag:
     ;reset flag
@@ -1217,8 +1290,13 @@ projectile_update:
   
 
   return_projectile_update:
+    POP R8
+    POP R7
+    POP R6
     POP R5
     POP R4
     POP R3
+    POP R2
+    POP R1
     POP R0
     RET
