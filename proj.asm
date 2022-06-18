@@ -23,18 +23,16 @@ CLEAR_SCREEN EQU 6002H
 SET_LAYER EQU 6004H
 SET_BACKGROUND EQU 6042H
 
-SET_LOOP_VIDEO EQU 605CH
-STOP_LOOP_VIDEO EQU 6066H
-STOP_ALL_VIDEO EQU 6068H
-
 MIN_SCREEN_WIDTH EQU 0
 MAX_SCREEN_WIDTH EQU 64
 
 MIN_SCREEN_HEIGHT EQU 0
 MAX_SCREEN_HEIGHT EQU 32
 
-;audio
-PLAY_SOUND EQU 0605AH
+;media
+SET_MEDIA EQU 0605AH
+STOP_MEDIA EQU 6066H
+STOP_ALL_MEDIA EQU 6068H
 
 ;energy display
 SET_ENERGY EQU 0A000H ;address of energy display (POUT-1)
@@ -117,22 +115,22 @@ AGENTS:
   WORD 4
 
   ;agent 1
-  WORD 0, 0, -1, ENEMY_SPRITES ;(x, y, stage, sprites)
+  WORD 0, 0, -1, ENEMY_SPRITES ;(x, y, state, sprites)
 
   ;agent 2
-  WORD 0, 0, -1, FRIEND_SPRITES ;(x, y, stage, sprites)
+  WORD 0, 0, -1, FRIEND_SPRITES ;(x, y, state, sprites)
 
   ;agent 3
-  WORD 0, 0, -1, ENEMY_SPRITES ;(x, y, stage, sprites)
+  WORD 0, 0, -1, ENEMY_SPRITES ;(x, y, state, sprites)
 
   ;agent 4
-  WORD 0, 0, -1, FRIEND_SPRITES ;(x, y, stage, sprites)
+  WORD 0, 0, -1, FRIEND_SPRITES ;(x, y, state, sprites)
 
 PLAYER:
-  WORD 30, 25, -1, PLAYER_SPRITES ;(x, y, stage, current_sprite)
+  WORD 30, 25, -1, PLAYER_SPRITES ;(x, y, state, current_sprite)
 
 PROJECTILE:
-  WORD 0, 0, -1, PROJECTILE_SPRITES ;(x, y, stage, sprites)
+  WORD 0, 0, -1, PROJECTILE_SPRITES ;(x, y, state, sprites)
 
 ;SPRITES
 PLAYER_SPRITES:
@@ -199,6 +197,14 @@ ENEMY_SPRITES:
   WORD NUDE, DARKRED, RED, DARKRED, NUDE
   WORD 0, NUDE, NUDE, NUDE, 0
 
+  ;sprite #5
+  WORD 5 ;lenght value of caracter
+  WORD 5 ;height value of caracter
+  WORD 0, DARKYELLOW, DARKYELLOW, DARKYELLOW, 0
+  WORD DARKYELLOW, DARKYELLOW, YELLOW, DARKYELLOW, DARKYELLOW
+  WORD DARKYELLOW, DARKYELLOW, YELLOW, DARKYELLOW, DARKYELLOW   
+  WORD DARKYELLOW, DARKYELLOW, YELLOW, DARKYELLOW, DARKYELLOW
+  WORD 0, DARKYELLOW, DARKYELLOW, DARKYELLOW, 0
 
 FRIEND_SPRITES:
   ;sprite #0 
@@ -236,21 +242,18 @@ FRIEND_SPRITES:
   WORD NUDE, DARKGREEN, GREEN, DARKGREEN, NUDE
   WORD 0, NUDE, NUDE, NUDE, 0
 
-PROJECTILE_SPRITES:
-  WORD 1 ;lenght
-  WORD 1 ;width
-  WORD GREEN
-
-EXPLOSION_SPRITES:
   WORD 5 ;lenght value of caracter
   WORD 5 ;height value of caracter
-
-  ;sprite 0
   WORD 0, DARKYELLOW, DARKYELLOW, DARKYELLOW, 0
   WORD DARKYELLOW, DARKYELLOW, YELLOW, DARKYELLOW, DARKYELLOW
   WORD DARKYELLOW, DARKYELLOW, YELLOW, DARKYELLOW, DARKYELLOW   
   WORD DARKYELLOW, DARKYELLOW, YELLOW, DARKYELLOW, DARKYELLOW
   WORD 0, DARKYELLOW, DARKYELLOW, DARKYELLOW, 0
+
+PROJECTILE_SPRITES:
+  WORD 1 ;lenght
+  WORD 1 ;width
+  WORD GREEN
 
 ;**********************************************************************************
 ;--------------------------------------CODE----------------------------------------
@@ -292,11 +295,12 @@ start:
     CALL agents_update
     CALL projectile_update
 
-    ;check gameover
-    CALL handle_game_over
 
     ;handle keyboard actions
     CALL handle_actions
+    
+    ;check gameover
+    CALL handle_game_over
 
     JMP game_handler_loop
 
@@ -305,7 +309,7 @@ main_menu:
   PUSH R1
   
   MOV R1, 0
-  MOV [SET_LOOP_VIDEO], R1
+  MOV [SET_MEDIA], R1
 
   loop_main_menu:
     CALL listen_keyboard
@@ -314,7 +318,7 @@ main_menu:
     CMP R0, R1
     JNZ loop_main_menu
 
-  MOV [STOP_LOOP_VIDEO], R5
+  MOV [STOP_MEDIA], R5
 
   POP R1
   POP R0
@@ -473,10 +477,15 @@ handle_actions:
   JMP return_handle_actions
 
   pause_menu:
+    ;start pause audio
+    MOV R3, 1 ;pause audio index is 1
+    
     ;if last key pressed is the pause key skip
     MOV R2, [LAST_PRESSED_KEY]
     CMP R0, R2
     JZ return_handle_actions
+
+    MOV [SET_MEDIA], R3 ;play pause audio
 
     MOV R2, [SET_BACKGROUND] ;save current background
 
@@ -497,6 +506,8 @@ handle_actions:
       MOV R1, KEY_PAUSE
       CMP R0, R1
       JNZ loop_pause_menu
+
+    MOV [STOP_MEDIA], R3 ;stop pause audio
 
     MOV [SET_BACKGROUND], R2
     JMP return_handle_actions
@@ -601,7 +612,7 @@ handle_actions:
   ; **********************************************************************
   shoot_projectile:
     ;check if a projectile already exist
-    MOV R0, [PROJECTILE+4] ;get projectile stage
+    MOV R0, [PROJECTILE+4] ;get projectile state
     CMP R0, 0 ;check if projectile exists
     JZ return_handle_actions ;if projectile already exists don't do anything
 
@@ -616,7 +627,7 @@ handle_actions:
     MOV [PROJECTILE], R4 ;set x on the middle of mario
     MOV [PROJECTILE+2], R5
 
-    ;set projectile stage to 0
+    ;set projectile state to 0
     MOV R0, 0
     MOV [PROJECTILE+4], R0
 
@@ -710,28 +721,12 @@ movement:
   MOV R8, 0 ;set action to "delete"
   CALL render_entity ; delete sprite with action setted previously
 
-  ;check if we have the special value for falling entities (2)
-  CMP R7, 2
-  JZ vertical_move
-
   ;horizontal movement
   MOV R1, [R3] ;get entity x postion
   ADD R1, R7 ;add direction to x position (1 or -1)
   ;update entity x
   MOV [R3], R1
   JMP render_new_position
-
-  ;vertical movement
-  vertical_move:
-    ;play sound #0
-    MOV R6, 0
-    MOV [PLAY_SOUND], R6
-
-    MOV R2, [R3+2] ;get entity y postion
-    ADD R2, 1 ;add 1 to y position
-    ;update entity y
-    MOV [R3+2], R2
-    JMP render_new_position
 
   ;update position on entity scope
   update_position_scope:
@@ -805,45 +800,6 @@ check_left_boundary:
 
   return_check_left:
     POP R5
-    POP R1
-    RET
-
-; **********************************************************************
-; CHECK_BOTTOM_BOUNDARY :
-;  - function to check if sprite is allowed to move down
-;  - if it isn't allowed, stop movement is called
-; **********************************************************************
-check_bottom_boundary:
-  PUSH R1
-  PUSH R2
-  PUSH R3
-
-  ;get entity Y position
-  MOV R1, [R3+2]
-
-  ;get entity height
-  MOV R2, [R3+8]
-
-  ;calc max Y position
-  MOV R3, MAX_SCREEN_HEIGHT
-
-  ;subtract 2 because of the ground
-  SUB R3, 2
-
-  ;get entity bottom edge
-  ADD R1, R2
-
-  ;check collision with ground
-  CMP R1, R3
-  JZ if_bottom_collision
-  JMP return_check_bottom
-
-  if_bottom_collision:
-    CALL stop_movement
-
-  return_check_bottom:
-    POP R3
-    POP R2
     POP R1
     RET
 
@@ -1100,6 +1056,10 @@ render_entity:
   ;get entity state (sprite index)
   MOV R6, [R3+4]
 
+  ;if entity state is -1 (dont try to render anything)
+  CMP R6, 0
+  JLT return_render_entity
+
   ;get entity sprites
   MOV R3, [R3+6]
 
@@ -1132,19 +1092,20 @@ render_entity:
     ;render
     CALL render_sprite
 
-  POP R9
-  POP R7
-  POP R6
-  POP R5
-  POP R3
-  POP R2
-  POP R1
-  RET
+  return_render_entity:
+    POP R9
+    POP R7
+    POP R6
+    POP R5
+    POP R3
+    POP R2
+    POP R1
+    RET
 
 ; **********************************************************************
-; ROT_ENERGY:
+; ENERGY_EXCEPTION:
 ;  - function that operates when exception 0 happens
-;  - occurs every 200ms
+;  - occurs every 3000ms
 ;  - sets energy flag to 1, for energy to be updated
 ; **********************************************************************
 energy_exception:
@@ -1157,7 +1118,7 @@ energy_exception:
   RFE
 
 ; **********************************************************************
-; ROT_ENERGY:
+; AGENTS_EXCEPTION:
 ;  - function that operates when exception 1 happens
 ;  - occurs every 400ms
 ;  - sets agents flag to 1, for agents to be updated
@@ -1172,9 +1133,9 @@ agents_exception:
   RFE
   
 ; **********************************************************************
-; ROT_ENERGY:
+; PROJECTILE_EXCEPTION:
 ;  - function that operates when exception 2 happens
-;  - occurs every 3000ms
+;  - occurs every 200ms
 ;  - sets projectile flag to 1, for projectile to be updated
 ; **********************************************************************
 projectile_exception:
@@ -1241,7 +1202,7 @@ agents_update:
   MOV R3, AGENTS
   ADD R3, 2
 
-  ;R3 has (x, y, stage, sprites)
+  ;R3 has (x, y, state, sprites)
 
   update_loop:
     ;check if we ended the loop
@@ -1249,9 +1210,24 @@ agents_update:
     JZ end_update_loop
     
     ;update agent   
+    MOV R2, [R3+4] ;get agent state
+    
+    ;check if agent is an explosion 
+    CMP R2, 5
+    JNZ not_an_explosion
+
+    ;delete explosion
+    MOV [SET_LAYER], R0
+    MOV R8, [R3+2] ;get current y position 
+    MOV R8, 0
+    CALL render_entity
+
+    ;set agent state to -1 to be regenerated ahead
+    MOV R2, -1
+
+    not_an_explosion:
     ;check if agent is dead
-    MOV R2, [R3+4] ;get agent stage
-    CMP R2, -1
+    CMP R2, -1 ;if state equals 1 means agent is dead, represents no sprite
     JNZ update_agent
 
     ;otherwise the player is in "dead" state and need to be regenerated
@@ -1259,7 +1235,7 @@ agents_update:
     MOV R10, -1
     MOV [R3+2], R10
 
-    ;set stage as 0
+    ;set state as 0
     MOV R10, 0
     MOV [R3+4], R10
 
@@ -1279,14 +1255,18 @@ agents_update:
     CMP R1, R2
     JLT gen_friendly
 
+    ;agent is identified as "friend" or "enemy" based on its sprite address
+
+    ;if agent is enemy sprite is "ENEMY_SPRITES"
     ;otherwise generate hostile
     MOV R2, ENEMY_SPRITES
     MOV [R3+6], R2
     JMP update_agent
 
+    ;if agent is friend sprite is "FRIEND_SPRITES"
     gen_friendly:
-    MOV R2, FRIEND_SPRITES
-    MOV [R3+6], R2
+      MOV R2, FRIEND_SPRITES
+      MOV [R3+6], R2
 
     update_agent:
       ;delete old agent
@@ -1302,20 +1282,21 @@ agents_update:
       ;save new y position value
       MOV [R3+2], R1
 
-      ;update stage
+      ;determines agent state based on its "y" value
+      ;update state
       MOV R2, 3
       DIV R1, R2 ;divide y position by 3
 
-      ;check if calculated stage is greater than 3
-      MOV R2, R1 ;backup of the stage
+      ;check if calculated state is greater than 3
+      MOV R2, R1 ;backup of the state
       SUB R2, 3
-      JLE update_stage
+      JLE update_state
 
-      ;otherwise rewrite stage
+      ;otherwise rewrite state
       MOV R1, 4
 
-    update_stage:
-      ;save new stage value
+    update_state:
+      ;save new state value
       MOV [R3+4], R1
 
     ;render new updated agent
@@ -1325,11 +1306,11 @@ agents_update:
 
     ;check collision with ground
     MOV R1, [R3+2] ;get updated y position
-    MOV R2, [R3+4] ;get updated stage
+    ADD R1, 1 ;add 1 to y position
+    MOV R2, [R3+4] ;get updated state
 
     ;get agent bottom edge position
     ADD R1, R2
-    ADD R1, 1 ;stage+1 is the sprite height
 
     ;get max possible y position
     MOV R2, MAX_SCREEN_HEIGHT
@@ -1363,10 +1344,16 @@ agents_update:
     CMP R2, R1
     JZ enemy_collision
 
+    ;play good_koopa audio
+    MOV R10, 2
+    MOV [SET_MEDIA], R10
+
     ;friendly collision
     ;increase energy by 10
+    ;called 2x (each time is 5)
     CALL energy_increase
     CALL energy_increase
+
     JMP delete_agent
 
     enemy_collision:
@@ -1434,8 +1421,8 @@ projectile_update:
 
   MOV R3, PROJECTILE
 
-  ;if projectile stage is -1 projectile doesnt exist
-  MOV R0, [R3+4] ;get projectile stage
+  ;if projectile state is -1 projectile doesnt exist
+  MOV R0, [R3+4] ;get projectile state
   CMP R0, -1
   JZ return_projectile_update
   
@@ -1463,7 +1450,7 @@ projectile_update:
     ;get current agent bottom edge
     MOV R2, [R1+2] ;get current agent y position
 
-    ;add the current sprite height (=stage+1)
+    ;add the current sprite height (=state+1)
     MOV R6, [R1+4]
     ADD R2, R6
     ADD R2, 1
@@ -1479,36 +1466,42 @@ projectile_update:
 
     ;check if projectile is on the left of the right edge of the agent
     ;making it between the 2 edges
-    ;add the current sprite width (=stage+1)
-    MOV R6, [R1+4] ;get current agent stage
+    ;add the current sprite width (=state+1)
+    MOV R6, [R1+4] ;get current agent state
     ADD R6, 1
     ADD R2, R6 ;R2 now have the right edge position
     
     CMP R2, R4
     JLT check_next_projectile_collision
     
-    ;otherwise delete agent
+    ;otherwise draw explosion and then delete agent
     MOV [SET_LAYER], R0 ;set rendering
-    MOV R8, 0 ;set action as delete
-    MOV R3, R1 ;set entity to delete as the current agent
-    CALL render_entity
 
-    ;set stage to -1 to be regenerated at next agents update
-    MOV R6, -1
+    ;draw explosion
+    MOV R6, 5
     MOV [R1+4], R6
+         
+    MOV R8, 1 ;set action to write
+    MOV R3, R1 ;set entity that exploded (current agent)
+    CALL render_entity
 
     ;check if it's a bad agent in that case increase energy by 5
     MOV R8, ENEMY_SPRITES
-    MOV R6, [R1+6]
+    MOV R6, [R1+6] ;get agent sprite address
     CMP R6, R8
     JNZ delete_projectile
 
     ;otherwise increase
+    ;play bad hit audio
+    MOV R0, 4
+    MOV [SET_MEDIA], R0
+    
     CALL energy_increase
     JMP delete_projectile
 
     check_next_projectile_collision:
       ;set pointer to the next agent
+      ;increase by 8 to get next agent address
       MOV R6, 8
       ADD R7, R6
 
@@ -1537,14 +1530,13 @@ projectile_update:
   delete_projectile:
     MOV R3, PROJECTILE
     MOV R0, -1
-    MOV [R3+4], R0 ;set stage as -1
+    MOV [R3+4], R0 ;set state as -1
 
   reset_projectile_flag:
     ;reset flag
     MOV R0, 0
     MOV [PROJECTILE_FLAG], R0
   
-
   return_projectile_update:
     POP R8
     POP R7
@@ -1565,6 +1557,7 @@ projectile_update:
 handle_game_over:
   PUSH R0
   PUSH R1
+  PUSH R2
   
   ;check if game over flag is true
   MOV R0, [GAMEOVER_FLAG]
@@ -1572,15 +1565,23 @@ handle_game_over:
   JNZ return_handle_game_over
 
   ;handle game over
+  ;play game-over audio
+  MOV R2, 3
+  MOV [SET_MEDIA], R2
+
   MOV [CLEAR_SCREEN], R0 ;clear pixels on screen
   MOV [SET_BACKGROUND], R9
 
+  ;listen keyboard untill "KEY_START" is pressed
   loop_gameover_menu:
     CALL listen_keyboard
     MOV R0, [CURRENT_PRESSED_KEY]
     MOV R1, KEY_START
     CMP R0, R1
     JNZ loop_gameover_menu
+
+  ;pause audio
+  MOV [STOP_MEDIA], R2
 
   ;set game background
   MOV R0, 0
@@ -1593,6 +1594,7 @@ handle_game_over:
   CALL reset_game
 
   return_handle_game_over:
+    POP R2
     POP R1
     POP R0
     RET
@@ -1622,15 +1624,18 @@ reset_game:
     JZ agents_resetted
 
     ;delete agent
+    ;clears pixels of agent
     MOV [SET_LAYER], R0 ;set rendering layer
     MOV R8, 0
     CALL render_entity
 
-    ;reset stage of the agent
+    ;reset state of the agent
+    ;set agent sprite to -1
     MOV R2, -1
     MOV [R3+4], R2
 
     ;go to next agent
+    ;add 8 to get next agent address
     MOV R2, 8
     ADD R3, R2
 
@@ -1645,25 +1650,18 @@ reset_game:
   MOV [CURRENT_ENERGY], R2
 
   ;set initial energy
+  ;set energy display level to max, 100
   MOV R2, 100H
   MOV [SET_ENERGY], R2
-
-  MOV R3, PROJECTILE
-  MOV R2, -1
-  MOV R0, [R3+4]
-  CMP R0, R2
-  JZ skip_delete_projectil
 
   ;delete projectile
   MOV R8, 0
   MOV R3, PROJECTILE
   CALL render_entity
 
-  ;set projectile stage to -1
+  ;set projectile state to -1
   MOV R2, -1
   MOV [R3+4], R2
-
-  skip_delete_projectil:
 
   ;reset background
   MOV R0, 0

@@ -718,10 +718,10 @@
     "positionX" : 258,
     "positionY" : 112,
     "simGuiVisibleInSimulation" : true,
-    "simGuiXRelative" : 959,
-    "simGuiYRelative" : 54,
-    "simGuiWidth" : 798,
-    "simGuiHeight" : 880,
+    "simGuiXRelative" : 1000,
+    "simGuiYRelative" : 282,
+    "simGuiWidth" : 1036,
+    "simGuiHeight" : 619,
     "clockPeriod" : 200,
     "startAutomatically" : false,
     "simulationMaster" : true,
@@ -1520,6 +1520,30 @@
       "relative start time" : 0.0,
       "relative stop time" : 1.0,
       "playAsClip" : false
+    }, {
+      "filePathName" : "assets\\audios\\pausa.mp3",
+      "relative sound volume" : 1.0,
+      "relative start time" : 0.0,
+      "relative stop time" : 1.0,
+      "playAsClip" : true
+    }, {
+      "filePathName" : "assets\\audios\\good_koopa.mp3",
+      "relative sound volume" : 1.0,
+      "relative start time" : 0.0,
+      "relative stop time" : 1.0,
+      "playAsClip" : true
+    }, {
+      "filePathName" : "assets\\audios\\game-over-song.mp3",
+      "relative sound volume" : 1.0,
+      "relative start time" : 0.0,
+      "relative stop time" : 1.0,
+      "playAsClip" : true
+    }, {
+      "filePathName" : "assets\\audios\\bad_koopa.mp3",
+      "relative sound volume" : 1.0,
+      "relative start time" : 0.0,
+      "relative stop time" : 1.0,
+      "playAsClip" : true
     } ],
     "addressable data" : {
       "className" : "ModuleExtensionMemoryMediaCenter",
