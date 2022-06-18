@@ -22,6 +22,10 @@ DELETE_WARNING EQU 6040H
 CLEAR_SCREEN EQU 6002H
 SET_BACKGROUND EQU 6042H
 
+SET_LOOP_VIDEO EQU 605CH
+STOP_LOOP_VIDEO EQU 6066H
+STOP_ALL_VIDEO EQU 6068H
+
 MIN_SCREEN_WIDTH EQU 0
 MAX_SCREEN_WIDTH EQU 64
 
@@ -49,8 +53,10 @@ PIN_INPUT EQU 0E000H
 KEY_LEFT EQU 00H
 KEY_RIGHT EQU 02H
 KEY_SHOOT EQU 01H
-KEY_ENERGY_UP EQU 04H
-KEY_ENERGY_DOWN EQU 05H
+
+KEY_START EQU 0CH
+KEY_PAUSE EQU 0DH
+KEY_END EQU 0EH
 
 ;colors
 BLACK EQU 0F000H
@@ -83,7 +89,7 @@ LAST_PRESSED_KEY:
   WORD -1 ;default value for last pressed key
 
 CURRENT_ENERGY:
-  WORD 064H ;starting value (100% energy)
+  WORD 100 ;starting value  (105 because exception will decrease it in beggining)
 
 ;FLAGS
 ENERGY_FLAG:
@@ -94,6 +100,9 @@ AGENTS_FLAG:
 
 PROJECTILE_FLAG:
   WORD 0 ;by default flag is 0 (no projectile update)
+GAMEOVER_FLAG:
+  WORD 0
+
 ;EXCEPTIONS TABLE
 TAB:
   WORD rot_agents
@@ -241,9 +250,10 @@ setup:
   MOV [CLEAR_SCREEN], R1 ;clear pixels on screen
   MOV R1, 0 ;background 0
   MOV [SET_BACKGROUND], R1 ;set background
-  MOV R2, 100H
-  MOV [SET_ENERGY], R2 ;set initial energy
-  MOV BTE, TAB			; inicializa BTE (registo de Base da Tabela de Exceções)
+  MOV BTE, TAB ;init table of exceptions
+
+  MOV R0, 100H
+  MOV [SET_ENERGY], R0 ;set energy to 100
 
   ;init exceptions
   EI0
@@ -253,19 +263,50 @@ setup:
   
 start:
   ;start keyboard listen
+  CALL main_menu
+
+  ;set energy flag as 0
+  MOV R2, 0
+  MOV [ENERGY_FLAG], R2
+
   game_handler_loop:  
     ;read the lines of the keyboard and return the read key at R0
-    CALL handle_keyboard
+    CALL listen_keyboard
 
     ;handle updates
     CALL energy_update
     CALL agents_update
     CALL projectile_update
 
+    ;check gameover
+    CALL handle_game_over
+
     ;handle keyboard actions
     CALL handle_actions
 
     JMP game_handler_loop
+
+main_menu:
+  PUSH R0
+  PUSH R1
+  
+  MOV R1, 0
+  MOV [SET_LOOP_VIDEO], R1
+
+  loop_main_menu:
+    CALL listen_keyboard
+    MOV R0, [CURRENT_PRESSED_KEY]
+    MOV R1, KEY_START
+    CMP R0, R1
+    JNZ loop_main_menu
+
+  MOV [STOP_LOOP_VIDEO], R5
+
+  POP R1
+  POP R0
+  RET
+
+
 
 ; **********************************************************************
 ; RENDER_SPRITE :
@@ -331,12 +372,12 @@ render_pixel:
 ; HANDLE_KEYBOARD :
 ;  - loop until a key is pressed on keyboard and execute function accordingly
 ; **********************************************************************
-handle_keyboard:
+listen_keyboard:
   PUSH R0
   PUSH R1 ;max line / max background index
   PUSH R6 ;line to test / sprite to render / constant to convert hext to decimal
 
-  MOV R1, 8 ;max line and max background are both 8
+  MOV R1, 8 ;max line
 
   MOV R6, 1 ;start by listening on line 1
 
@@ -346,17 +387,17 @@ handle_keyboard:
     
     ;if a key is being pressed
     CMP R0, -1
-    JNZ return_handle_keyboard
+    JNZ return_listen_keyboard
     
     ;check if we already listened the whole keyboard
     CMP R6, R1 ;R6 == 8
-    JZ return_handle_keyboard
+    JZ return_listen_keyboard
 
     ;otherwise 
     ROL R6, 1 ;test next line by rotating to the left
     JMP test_line
 
-  return_handle_keyboard:
+  return_listen_keyboard:
     ;save the pressed key
     MOV [CURRENT_PRESSED_KEY], R0
 
@@ -392,8 +433,67 @@ handle_actions:
   CMP R0, KEY_SHOOT
   JZ shoot_projectile
 
+  MOV R2, KEY_PAUSE
+  CMP R0, R2
+  JZ pause_menu
+
+  MOV R2, KEY_END
+  CMP R0, R2
+  JZ end_menu
+
   ;the key doesn't have any action associated
   JMP return_handle_actions
+
+  pause_menu:
+    ;if last key pressed is the pause key skip
+    MOV R2, [LAST_PRESSED_KEY]
+    CMP R0, R2
+    JZ return_handle_actions
+
+    MOV R2, [SET_BACKGROUND] ;save current background
+
+    MOV R1, 10
+    MOV [CLEAR_SCREEN], R1 ;clear pixels on screen
+    MOV [SET_BACKGROUND], R1
+
+    ;wait till the key is released
+    waiting_release:
+      CALL listen_keyboard
+      MOV R0, [CURRENT_PRESSED_KEY]
+      CMP R0, -1
+      JNZ waiting_release
+
+    loop_pause_menu:
+      CALL listen_keyboard
+      MOV R0, [CURRENT_PRESSED_KEY]
+      MOV R1, KEY_PAUSE
+      CMP R0, R1
+      JNZ loop_pause_menu
+
+    MOV [SET_BACKGROUND], R2
+    JMP return_handle_actions
+
+  end_menu:
+    ;if last key pressed is the pause key skip
+    MOV R2, [LAST_PRESSED_KEY]
+    CMP R0, R2
+    JZ return_handle_actions
+
+    MOV R1, 11
+    MOV [CLEAR_SCREEN], R1 ;clear pixels on screen
+    MOV [SET_BACKGROUND], R1
+
+    loop_end_menu:
+      CALL listen_keyboard
+      MOV R0, [CURRENT_PRESSED_KEY]
+      MOV R1, KEY_START
+      CMP R0, R1
+      JNZ loop_end_menu
+
+    ;reset game
+    CALL reset_game
+
+    JMP return_handle_actions
 
   ; **********************************************************************
   ; MOVE_MARIO_LEFT :
@@ -497,13 +597,14 @@ handle_actions:
     JMP return_handle_actions
 
   no_key_pressed:
-    ;save this key as last pressed key
-    MOV [LAST_PRESSED_KEY], R0
-
     ;render player idle
     CALL player_idle
 
   return_handle_actions:
+    ;save key pressed as last key pressed
+    MOV R0, [CURRENT_PRESSED_KEY]
+    MOV [LAST_PRESSED_KEY], R0
+
     POP R10
     POP R8
     POP R7
@@ -514,6 +615,7 @@ handle_actions:
     POP R1
     POP R0
     RET
+
     
 ; **********************************************************************
 ; LISTEN_KEYBOARD_LINE :
@@ -693,7 +795,7 @@ check_bottom_boundary:
   ;get entity bottom edge
   ADD R1, R2
 
-  ;check colision with ground
+  ;check collision with ground
   CMP R1, R3
   JZ if_bottom_collision
   JMP return_check_bottom
@@ -830,6 +932,16 @@ energy_decrease:
   MOV R2, SET_ENERGY
   MOV [R2], R8
 
+  ;check game over
+  CMP R8, 0
+  JNZ return_energy_decrease
+
+  ;set game over flag
+  MOV R8, 1
+  MOV [GAMEOVER_FLAG], R8
+
+  MOV R9, 12 ;set no energy screen
+
   return_energy_decrease:
     POP R10
     POP R8
@@ -880,6 +992,21 @@ hexa_to_decimal:
     POP R3
     POP R2
     POP R1
+    RET
+
+absolute_value:
+  PUSH R0
+
+  ;check if value is negative
+  CMP R1, 0
+  JGE return_absolute_value ;return if positive
+
+  ;otherwise make positive
+  MOV R0, -1
+  MUL R1, R0
+  
+  return_absolute_value:
+    POP R0
     RET
 
 ; **********************************************************************
@@ -1024,6 +1151,7 @@ agents_update:
   PUSH R2
   PUSH R3
   PUSH R4
+  PUSH R5
   PUSH R10
 
   ;if flag is off skip update
@@ -1049,9 +1177,8 @@ agents_update:
     CMP R2, -1
     JNZ update_agent
 
-    ;otherwise generate stats for the new agent
-
-    ;set y position as -1 becuase it's going to be incremented ahead
+    ;otherwise the player is in "dead" state and need to be regenerated
+    ;set y position as -1 because it's going to be incremented ahead
     MOV R10, -1
     MOV [R3+2], R10
 
@@ -1060,7 +1187,7 @@ agents_update:
     MOV [R3+4], R10
 
     ;generate random column
-    MOV R10, 58 ;range of the random number to be generated (column)
+    MOV R10, 59 ;range of the random number to be generated (column)
     CALL gen_number ;returns random number on R1
 
     ;set agent column
@@ -1117,30 +1244,70 @@ agents_update:
     MOV R8, 1 ;set action as write
     CALL render_entity
 
-    ;check if touching bottom
+    ;check collision with ground
     MOV R1, [R3+2] ;get updated y position
     MOV R2, [R3+4] ;get updated stage
 
     ;get agent bottom edge position
-    ADD R1, R2 
+    ADD R1, R2
     ADD R1, 1 ;stage+1 is the sprite height
 
     ;get max possible y position
     MOV R2, MAX_SCREEN_HEIGHT
     SUB R2, 1
 
+    ;if collision delete_agent
     CMP R1, R2
-    JNZ thank_you_next
+    JZ delete_agent
+    
+    ;check collision with player
+    ;check if agent is at the same y position as the player
+    MOV R5, [PLAYER+2] ;get player y position
+    CMP R1, R5
+    JLT check_next_player_collision
 
-    ;delete agent
-    MOV R8, 0
-    CALL render_entity
+    ;check if agent is at the x position range as the player
+    MOV R5, [PLAYER] ;get player x position
+    MOV R1, [R3] ;get agent x position
 
-    ;otherwise set state as "deleted"
-    MOV R2, -1
-    MOV [R3+4], R2
+    ;check the subtraction 
+    SUB R1, R5
+    CALL absolute_value
 
-    thank_you_next:
+    ;check if the difference is less than 5
+    CMP R1, 5
+    JGE check_next_player_collision
+
+    ;before delete agent check if it's hostile or friendly and act accordingly
+    MOV R1, ENEMY_SPRITES
+    MOV R2, [R3+6] ;get agent sprite
+    CMP R2, R1
+    JZ enemy_collision
+
+    ;friendly collision
+    ;increase energy by 10
+    CALL energy_increase
+    CALL energy_increase
+    JMP delete_agent
+
+    enemy_collision:
+      ;set game over flag
+      MOV R0, 1
+      MOV [GAMEOVER_FLAG], R0
+
+      ;set screen to game over screen
+      MOV R9, 11
+
+    delete_agent:
+      ;if any collision delete agent
+      MOV R8, 0
+      CALL render_entity
+
+      ;otherwise set state as "deleted"
+      MOV R2, -1
+      MOV [R3+4], R2
+
+    check_next_player_collision:
       ;go to next agent
       MOV R1, 8
       ADD R3, R1
@@ -1155,6 +1322,7 @@ agents_update:
 
   return_agents_update:
     POP R10
+    POP R5
     POP R4
     POP R3
     POP R2
@@ -1193,16 +1361,16 @@ projectile_update:
   MOV R5, [R3+2] ;get current projectile y
   SUB R5, 1 ;change y position to make projectile go up
 
-  ;check for colision
+  ;check for collision
   MOV R0, [AGENTS];get number of agents 
 
   ;get agents
   MOV R7, AGENTS
   ADD R7, 2
 
-  check_colisions_loop:
+  check_collisions_loop:
     CMP R0, 0 ;check if we ended the loop
-    JZ no_colisions
+    JZ no_collisions
 
     MOV R1, R7 ;get current agent
 
@@ -1216,12 +1384,12 @@ projectile_update:
 
     ;check if current agent is at the same line as projectile
     CMP R2, R5
-    JLT go_next_colision_check
+    JLT check_next_projectile_collision
 
     ;check if projectile is on the right of the left edge of the agent
     MOV R2, [R1] ;get current agent x position
     CMP R4, R2
-    JLT go_next_colision_check
+    JLT check_next_projectile_collision
 
     ;check if projectile is on the left of the right edge of the agent
     ;making it between the 2 edges
@@ -1231,7 +1399,7 @@ projectile_update:
     ADD R2, R6 ;R2 now have the right edge position
     
     CMP R2, R4
-    JLT go_next_colision_check
+    JLT check_next_projectile_collision
     
     ;otherwise delete agent
     MOV R8, 0 ;set action as delete
@@ -1252,16 +1420,16 @@ projectile_update:
     CALL energy_increase
     JMP delete_projectile
 
-    go_next_colision_check:
+    check_next_projectile_collision:
       ;set pointer to the next agent
       MOV R6, 8
       ADD R7, R6
 
       ;subtract 1 from the iterator
       SUB R0, 1
-      JMP check_colisions_loop
+      JMP check_collisions_loop
 
-  no_colisions:
+  no_collisions:
     ;check if value is 14
     MOV R0, 14 ;14 instead of 12 because our player is 2 pixels higher 
 
@@ -1300,3 +1468,105 @@ projectile_update:
     POP R1
     POP R0
     RET
+
+handle_game_over:
+  PUSH R0
+  PUSH R1
+  
+  ;game over screen can be 2 different screens
+
+  ;check if game over flag is true
+  MOV R0, [GAMEOVER_FLAG]
+  CMP R0, 1
+  JNZ return_handle_game_over
+
+  ;handle game over
+  MOV [CLEAR_SCREEN], R0 ;clear pixels on screen
+  MOV [SET_BACKGROUND], R9
+
+  loop_gameover_menu:
+    CALL listen_keyboard
+    MOV R0, [CURRENT_PRESSED_KEY]
+    MOV R1, KEY_START
+    CMP R0, R1
+    JNZ loop_gameover_menu
+
+  ;set game background
+  MOV R0, 0
+  MOV [SET_BACKGROUND], R0
+
+  ;set gameover flag as 0
+  MOV R0, 0
+  MOV [GAMEOVER_FLAG], R0
+
+  CALL reset_game
+
+  return_handle_game_over:
+    POP R1
+    POP R0
+    RET
+
+reset_game:
+  PUSH R0
+  PUSH R1
+  PUSH R2
+  PUSH R3
+
+  ;reset agents
+  MOV R0, [AGENTS] ;get number of agents
+  
+  ;get agents
+  MOV R3, AGENTS
+  ADD R3, 2
+  
+  reset_agents_loop:
+    CMP R0, 0
+    JZ agents_resetted
+
+    ;delete agent
+    MOV R8, 0
+    CALL render_entity
+
+    ;reset stage of the agent
+    MOV R2, -1
+    MOV [R3+4], R2
+
+    ;go to next agent
+    MOV R2, 8
+    ADD R3, R2
+
+    ;subtract iterator
+    SUB R0, 1
+
+  agents_resetted:
+
+  ;reset energy
+  CALL reset_energy
+
+  ;reset background
+  MOV R0, 0
+  MOV [SET_BACKGROUND], R0
+
+  return_reset_game:
+    POP R3
+    POP R2
+    POP R1
+    POP R0
+    RET
+
+reset_energy:
+  PUSH R2
+
+  MOV R2, 100 ;105 because energy exception update will immediately
+  MOV [CURRENT_ENERGY], R2
+
+  ;set initial energy
+  MOV R2, 100H
+  MOV [SET_ENERGY], R2
+
+  ;set energy flag as 0
+  MOV R2, 0
+  MOV [ENERGY_FLAG], R2
+
+  POP R2
+  RET
