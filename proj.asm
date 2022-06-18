@@ -20,6 +20,7 @@ DELETE_WARNING EQU 6040H
 
 ;screen
 CLEAR_SCREEN EQU 6002H
+SET_LAYER EQU 6004H
 SET_BACKGROUND EQU 6042H
 
 SET_LOOP_VIDEO EQU 605CH
@@ -69,6 +70,8 @@ BROWN EQU 0FA52H
 NUDE EQU 0FFB5H
 BLUE EQU 0F06FH
 WHITE EQU 0FFFFH
+YELLOW EQU 0FFF0H
+DARKYELLOW EQU 0FFA3H
 
 ;**********************************************************************************
 ;-------------------------------------DADOS----------------------------------------
@@ -105,9 +108,9 @@ GAMEOVER_FLAG:
 
 ;EXCEPTIONS TABLE
 TAB:
-  WORD rot_agents
-  WORD rot_projectile
-  WORD rot_energy
+  WORD agents_exception
+  WORD projectile_exception
+  WORD energy_exception
 ;ENTITIES:
 AGENTS:
   ;number of agents
@@ -238,6 +241,17 @@ PROJECTILE_SPRITES:
   WORD 1 ;width
   WORD GREEN
 
+EXPLOSION_SPRITES:
+  WORD 5 ;lenght value of caracter
+  WORD 5 ;height value of caracter
+
+  ;sprite 0
+  WORD 0, DARKYELLOW, DARKYELLOW, DARKYELLOW, 0
+  WORD DARKYELLOW, DARKYELLOW, YELLOW, DARKYELLOW, DARKYELLOW
+  WORD DARKYELLOW, DARKYELLOW, YELLOW, DARKYELLOW, DARKYELLOW   
+  WORD DARKYELLOW, DARKYELLOW, YELLOW, DARKYELLOW, DARKYELLOW
+  WORD 0, DARKYELLOW, DARKYELLOW, DARKYELLOW, 0
+
 ;**********************************************************************************
 ;--------------------------------------CODE----------------------------------------
 ;**********************************************************************************
@@ -306,8 +320,6 @@ main_menu:
   POP R0
   RET
 
-
-
 ; **********************************************************************
 ; RENDER_SPRITE :
 ;   - function to render the sprites
@@ -317,7 +329,11 @@ main_menu:
 ;   - the sprite is set by the sprite index also stored on the entity table
 ; **********************************************************************
 render_sprite:
-  PUSH R0 ;register to temp store values
+  PUSH R1
+  PUSH R2
+  PUSH R3
+  PUSH R4
+  PUSH R5
   PUSH R6 ;iterator
 
   MOV R6, R4 ;starting iterator value
@@ -337,8 +353,16 @@ render_sprite:
     SUB R5, 1 ;decrement height of sprite
     JNZ render_line
 
+  ;reset layer
+  MOV R1, 0
+  MOV [SET_LAYER], R1
+
   POP R6
-  POP R0
+  POP R5
+  POP R4
+  POP R3
+  POP R2
+  POP R1
   RET
 
 ; **********************************************************************
@@ -405,7 +429,11 @@ listen_keyboard:
     POP R1
     POP R0
     RET
-  
+
+; **********************************************************************
+; HANDLE_ACTIONS :
+;   - function that handles actions accordigly to key pressed
+; **********************************************************************
 handle_actions:
   PUSH R0 ;key that was listened / current background index
   PUSH R1 ;max line / max background index
@@ -565,6 +593,12 @@ handle_actions:
     CALL movement
     JMP return_handle_actions
 
+  ; **********************************************************************
+  ; SHOOT_PROJECTILE :
+  ;  - function to shoot the projectile
+  ;  - by pressing the key "1", mario shoots
+  ;  - it only enables you to shoot one at each time
+  ; **********************************************************************
   shoot_projectile:
     ;check if a projectile already exist
     MOV R0, [PROJECTILE+4] ;get projectile stage
@@ -596,6 +630,10 @@ handle_actions:
 
     JMP return_handle_actions
 
+  ; **********************************************************************
+  ; NO_KEY_PRESSED :
+  ;  - function that executes when no key was pressed
+  ; **********************************************************************
   no_key_pressed:
     ;render player idle
     CALL player_idle
@@ -867,9 +905,7 @@ normalize_index:
 
 ; **********************************************************************
 ; ENERGY_INCREASE :
-;  - function to increase energy level
-;  - by pressing "4", energy increases by 1
-;  - it only increases 1 at a time
+;  - function to increase energy level by 5
 ; **********************************************************************
 energy_increase:
   PUSH R2
@@ -904,9 +940,7 @@ energy_increase:
 
 ; **********************************************************************
 ; ENERGY_DECREASE :
-;   - function to decrease energy level
-;   - by pressing "5", energy decreases by 1
-;   - it only decreases 1 at a time
+;   - function to decrease energy level by 5
 ; **********************************************************************
 energy_decrease:
   PUSH R2
@@ -956,11 +990,6 @@ energy_decrease:
 ;  - R7 has the hexadecimal value
 ;  - R8 has the result
 ; **********************************************************************
-; numero R7
-; resultado R8
-; fator R1
-; div constant R2
-; digito R3
 hexa_to_decimal:
   PUSH R1
   PUSH R2
@@ -971,6 +1000,7 @@ hexa_to_decimal:
   MOV R2, 10
 
   MOV R8, 0
+  
 
   hexa_to_decimal_loop_start:
     MOD R10, R1 ; número = número MOD fator; número é o valor a converter
@@ -994,7 +1024,11 @@ hexa_to_decimal:
     POP R1
     RET
 
-absolute_value:
+; **********************************************************************
+; ABSOLUTE_VALUE :
+;  - function that returns the absolute value of R1
+; **********************************************************************
+absolute_value: 
   PUSH R0
 
   ;check if value is negative
@@ -1010,9 +1044,9 @@ absolute_value:
     RET
 
 ; **********************************************************************
-; GEN_NUMBER:
-;  - function to generate a random number
-;  - it generates a random number between 0 and 7
+; GEN_NUMBER :
+;  - function that generates a random number between 0 and R10
+;  - R10 is passed as a para
 ; **********************************************************************
 gen_number:
   ;receives a range on R10 (0-R10)
@@ -1020,7 +1054,11 @@ gen_number:
   MOV R1, [PIN_INPUT]
   MOD R1, R10
   RET
-
+  
+; **********************************************************************
+; PLAYER_IDLE:
+;  - function that render player idle sprite
+; **********************************************************************
 player_idle:
   PUSH R3
   PUSH R6
@@ -1042,7 +1080,10 @@ player_idle:
   POP R6
   POP R3
   RET
-
+; **********************************************************************
+; RENDER_ENTITY:
+;  - function to render entity given the params inside memory address R3
+; **********************************************************************
 render_entity:
   PUSH R1
   PUSH R2
@@ -1100,7 +1141,13 @@ render_entity:
   POP R1
   RET
 
-rot_energy:
+; **********************************************************************
+; ROT_ENERGY:
+;  - function that operates when exception 0 happens
+;  - occurs every 200ms
+;  - sets energy flag to 1, for energy to be updated
+; **********************************************************************
+energy_exception:
   PUSH R0
 
   MOV R0, 1
@@ -1109,7 +1156,13 @@ rot_energy:
   POP R0
   RFE
 
-rot_agents:
+; **********************************************************************
+; ROT_ENERGY:
+;  - function that operates when exception 1 happens
+;  - occurs every 400ms
+;  - sets agents flag to 1, for agents to be updated
+; **********************************************************************
+agents_exception:
   PUSH R0
 
   MOV R0, 1
@@ -1117,8 +1170,14 @@ rot_agents:
 
   POP R0
   RFE
-
-rot_projectile:
+  
+; **********************************************************************
+; ROT_ENERGY:
+;  - function that operates when exception 2 happens
+;  - occurs every 3000ms
+;  - sets projectile flag to 1, for projectile to be updated
+; **********************************************************************
+projectile_exception:
   PUSH R0
 
   MOV R0, 1
@@ -1127,6 +1186,12 @@ rot_projectile:
   POP R0
   RFE
 
+; **********************************************************************
+; ENERGY_UPDATE:
+;  - function that that updates energy level
+;  - if "ENERGY_FLAG" is 1 update
+;  - else skip
+; **********************************************************************
 energy_update:
   PUSH R0
 
@@ -1145,6 +1210,14 @@ energy_update:
     POP R0
     RET
 
+; **********************************************************************
+; AGENTS_UPDATE:
+;  - function that that updates agents
+;  - creates agents
+;  - check for colisions and delete agents
+;  - if "AGENTS_FLAG" is 1 update
+;  - else skip
+; **********************************************************************
 agents_update:
   PUSH R0
   PUSH R1
@@ -1160,17 +1233,21 @@ agents_update:
   JZ return_agents_update
 
   ;get number of agents
+  ;number of agents is held in the address at AGENTS
   MOV R0, [AGENTS]
 
   ;get agents
+  ;move address for the first agent 
   MOV R3, AGENTS
   ADD R3, 2
+
+  ;R3 has (x, y, stage, sprites)
 
   update_loop:
     ;check if we ended the loop
     CMP R0, 0
     JZ end_update_loop
-
+    
     ;update agent   
     ;check if agent is dead
     MOV R2, [R3+4] ;get agent stage
@@ -1213,6 +1290,7 @@ agents_update:
 
     update_agent:
       ;delete old agent
+      MOV [SET_LAYER], R0 ;set render layer
       MOV R8, 0
       CALL render_entity
       
@@ -1241,6 +1319,7 @@ agents_update:
       MOV [R3+4], R1
 
     ;render new updated agent
+    MOV [SET_LAYER], R0 ;set render layer
     MOV R8, 1 ;set action as write
     CALL render_entity
 
@@ -1300,6 +1379,7 @@ agents_update:
 
     delete_agent:
       ;if any collision delete agent
+      MOV [SET_LAYER], R0
       MOV R8, 0
       CALL render_entity
 
@@ -1311,7 +1391,7 @@ agents_update:
       ;go to next agent
       MOV R1, 8
       ADD R3, R1
-
+  
       SUB R0, 1 ;decrease loop iterator
       JMP update_loop
 
@@ -1330,6 +1410,12 @@ agents_update:
     POP R0
     RET
 
+; **********************************************************************
+; PROJECTILE_UPDATE:
+;  - function that updates the projectiles
+;  - shoots and deletes the projectiles
+;  - handles the colisions
+; **********************************************************************
 projectile_update:
   PUSH R0
   PUSH R1
@@ -1402,6 +1488,7 @@ projectile_update:
     JLT check_next_projectile_collision
     
     ;otherwise delete agent
+    MOV [SET_LAYER], R0 ;set rendering
     MOV R8, 0 ;set action as delete
     MOV R3, R1 ;set entity to delete as the current agent
     CALL render_entity
@@ -1438,9 +1525,10 @@ projectile_update:
     JZ delete_projectile
 
     ;otherwise
-    ;render updated projectile
-    ;update y position value
+    ;update y position of the projectile
     MOV [R3+2], R5
+
+    ;render updated projectile
     MOV R8, 1
     CALL render_entity
     JMP reset_projectile_flag
@@ -1469,12 +1557,15 @@ projectile_update:
     POP R0
     RET
 
+; **********************************************************************
+; HANDLE_GAME_OVER:
+;  - function that handles game over
+;  - if "GAMEOVER_FLAG" is 1, resets the game state
+; **********************************************************************
 handle_game_over:
   PUSH R0
   PUSH R1
   
-  ;game over screen can be 2 different screens
-
   ;check if game over flag is true
   MOV R0, [GAMEOVER_FLAG]
   CMP R0, 1
@@ -1506,11 +1597,18 @@ handle_game_over:
     POP R0
     RET
 
+; **********************************************************************
+; RESET_GAME:
+;  - function that resets the game state
+;  - clears agents and projectile
+;  - resets palyer's position and energy level
+; **********************************************************************
 reset_game:
   PUSH R0
   PUSH R1
   PUSH R2
   PUSH R3
+  PUSH R8
 
   ;reset agents
   MOV R0, [AGENTS] ;get number of agents
@@ -1524,6 +1622,7 @@ reset_game:
     JZ agents_resetted
 
     ;delete agent
+    MOV [SET_LAYER], R0 ;set rendering layer
     MOV R8, 0
     CALL render_entity
 
@@ -1537,26 +1636,11 @@ reset_game:
 
     ;subtract iterator
     SUB R0, 1
+    JMP reset_agents_loop
 
   agents_resetted:
 
   ;reset energy
-  CALL reset_energy
-
-  ;reset background
-  MOV R0, 0
-  MOV [SET_BACKGROUND], R0
-
-  return_reset_game:
-    POP R3
-    POP R2
-    POP R1
-    POP R0
-    RET
-
-reset_energy:
-  PUSH R2
-
   MOV R2, 100 ;105 because energy exception update will immediately
   MOV [CURRENT_ENERGY], R2
 
@@ -1564,9 +1648,40 @@ reset_energy:
   MOV R2, 100H
   MOV [SET_ENERGY], R2
 
-  ;set energy flag as 0
-  MOV R2, 0
-  MOV [ENERGY_FLAG], R2
+  MOV R3, PROJECTILE
+  MOV R2, -1
+  MOV R0, [R3+4]
+  CMP R0, R2
+  JZ skip_delete_projectil
 
-  POP R2
-  RET
+  ;delete projectile
+  MOV R8, 0
+  MOV R3, PROJECTILE
+  CALL render_entity
+
+  ;set projectile stage to -1
+  MOV R2, -1
+  MOV [R3+4], R2
+
+  skip_delete_projectil:
+
+  ;reset background
+  MOV R0, 0
+  MOV [SET_BACKGROUND], R0
+
+  ;reset exception flags
+  ;reset projectile flag as 0
+  MOV R0, 0
+  MOV [PROJECTILE_FLAG], R0
+
+  ;set energy flag as 0
+  MOV R0, 0
+  MOV [ENERGY_FLAG], R0
+
+  return_reset_game:
+    POP R8 
+    POP R3
+    POP R2
+    POP R1
+    POP R0
+    RET
