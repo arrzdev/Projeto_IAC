@@ -29,10 +29,12 @@ MAX_SCREEN_WIDTH EQU 64
 MIN_SCREEN_HEIGHT EQU 0
 MAX_SCREEN_HEIGHT EQU 32
 
-;media
-SET_MEDIA EQU 0605AH
+;audio
+PLAY_AUDIO EQU 0605AH
+
+;video
+PLAY_MEDIA EQU 605CH
 STOP_MEDIA EQU 6066H
-STOP_ALL_MEDIA EQU 6068H
 
 ;energy display
 SET_ENERGY EQU 0A000H ;address of energy display (POUT-1)
@@ -309,7 +311,7 @@ main_menu:
   PUSH R1
   
   MOV R1, 0
-  MOV [SET_MEDIA], R1
+  MOV [PLAY_MEDIA], R1
 
   loop_main_menu:
     CALL listen_keyboard
@@ -485,7 +487,7 @@ handle_actions:
     CMP R0, R2
     JZ return_handle_actions
 
-    MOV [SET_MEDIA], R3 ;play pause audio
+    MOV [PLAY_MEDIA], R3 ;play pause audio
 
     MOV R2, [SET_BACKGROUND] ;save current background
 
@@ -1346,7 +1348,7 @@ agents_update:
 
     ;play good_koopa audio
     MOV R10, 2
-    MOV [SET_MEDIA], R10
+    MOV [PLAY_AUDIO], R10
 
     ;friendly collision
     ;increase energy by 10
@@ -1494,7 +1496,7 @@ projectile_update:
     ;otherwise increase
     ;play bad hit audio
     MOV R0, 4
-    MOV [SET_MEDIA], R0
+    MOV [PLAY_AUDIO], R0
     
     CALL energy_increase
     JMP delete_projectile
@@ -1567,7 +1569,7 @@ handle_game_over:
   ;handle game over
   ;play game-over audio
   MOV R2, 3
-  MOV [SET_MEDIA], R2
+  MOV [PLAY_MEDIA], R2
 
   MOV [CLEAR_SCREEN], R0 ;clear pixels on screen
   MOV [SET_BACKGROUND], R9
